@@ -2,19 +2,21 @@ from collections import Counter
 from os import path, mkdir
 import pickle
 from nltk.util import ngrams as nltk_ngrams
-from numpy.random import choice, normal, binomial
+from numpy.random import choice, normal, binomial, uniform
 import numpy as np
 import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("numtogen", help="Input number of sample sentences to generate", type=int, default=10)
 parser.add_argument("grams", help="Specify the number n in n-gram", type=int, default=3)
+
 parser.add_argument("--rebuild", action="store_true", default=False, help="Rebuild vocab and word effect")
 
 args = parser.parse_args()
 
 NGRAM = args.grams
 NUM_TO_GEN = args.numtogen
+EMB_DIM = 20
 
 # Reading files
 fs = open("data/s.txt", "rb")
@@ -36,21 +38,33 @@ if not path.exists("data/vocab.pkl") or args.rebuild:
     vocab_list = counts[:10000]
     vocab = dict(vocab_list)
 
+    word_dict = dict()
+    
+    word_dict["<pad>"] = 0
+    for i, word in enumerate(vocab.keys()):
+        ip1 = i + 1
+        word_dict[word] = ip1
+
     f = open("data/vocab.pkl", "wb")
-    pickle.dump(vocab, f)
+    pickle.dump(word_dict, f)
     f.close()
 
 else:
     print("Loading vocabulary")
     f = open("data/vocab.pkl", "rb")
-    vocab = pickle.load(f)
+    word_dict = pickle.load(f)
     f.close()
 
-vocab_size = len(vocab)
+vocab = word_dict
+vocab_size = len(word_dict.keys())
 total_words = sum(vocab.values())
-word_dict = dict()
-for i, word in enumerate(vocab.keys()):
-    word_dict[word] = i
+
+embedding_matrix = np.array(uniform(-1,1,[vocab_size, EMB_DIM]))
+embedding_matrix[0] = np.zeros(EMB_DIM)
+
+f = open("data/embedding_matrix.pkl", "wb")
+pickle.dump(embedding_matrix, f)
+f.close()
 
 
 if not path.exists("data/effect_list.pkl") or args.rebuild:
@@ -142,11 +156,11 @@ if not path.exists("data/{}grams.pkl".format(NGRAM)) or args.rebuild:
 
 else:
     print("Loading {}-grams".format(NGRAM))
-    f = open("./data/ngrams.pkl", "rb")
+    f = open("./data/{}grams.pkl".format(NGRAM), "rb")
     ngrams = pickle.load(f)
     f.close()
 
-
+print("Generating samples")
 samples = []
 generated = 0
 # for i in range(NUM_TO_GEN):
@@ -194,20 +208,25 @@ while generated < NUM_TO_GEN:
                 bow[word_dict[word]] = 1
             sample["bow_repr"] = bow
 
-            r = np.dot(bow, effect_list)
+            sample["sentence_ind"] = np.asarray([word_dict[word] for word in cur_sentence])
+
+            r = np.dot(bow, effect_list) + normal()
             p = 1 / (1 + np.exp(-r))
             label = binomial(1, p)
             sample["label"] = label
 
             samples.append(sample)
             generated += 1
+            if generated % 100 == 0:
+                print("{} / {} generated".format(generated, NUM_TO_GEN))
             break
 
 
-"""
-for i in sample:
-    print(" ".join(i))
-"""
+print("showing first two examples")
+print(samples[0])
+print(samples[1])
+
+
 
 if not path.exists("./out"):
     mkdir("./out")
