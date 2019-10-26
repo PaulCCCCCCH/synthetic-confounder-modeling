@@ -17,7 +17,7 @@ MAP = {
     1: "positive"
     }
 
-def html_render(x_orig, alphas, max_len=30):
+def html_render(x_orig, alphas, effect_list, inv_dict, max_len=30):
     epsilon = 1e-10
     k = 80
     b = 600
@@ -26,10 +26,10 @@ def html_render(x_orig, alphas, max_len=30):
     #x_orig_words = x_orig.split(' ')[:max_len]
     
 
-    x_orig_words = x_orig[:max_len]
+    x_orig = x_orig[:max_len]
 
     orig_html = []
-    for i in range(len(x_orig_words)):
+    for i in range(len(x_orig)):
         color_val = color_vals[i]
         colors = [0, 0, 0]
         if color_val >= 510:
@@ -39,13 +39,18 @@ def html_render(x_orig, alphas, max_len=30):
         else:
             colors = [0, 255 - int(color_val), 0]
 
-        orig_html.append(format("<b style='color:rgb(%d,%d,%d)'>%s</b>" %(colors[0], colors[1], colors[2], x_orig_words[i])))
+        #Show word, hover to see word effect
+        #orig_html.append(format("<b style='color:rgb(%d,%d,%d)' title='%s'>%s</b>" %(colors[0], colors[1], colors[2], inv_dict[x_orig[i]], str(effect_list[x_orig[i]]))))
+
+
+        #Show word effect, hover to see word
+        orig_html.append(format("<b style='color:rgb(%d,%d,%d)' title='%s'>%s</b>" %(colors[0], colors[1], colors[2], str(effect_list[x_orig[i]]), inv_dict[x_orig[i]])))
     
     orig_html = ' '.join(orig_html)
     return orig_html
 
 
-def knit(xs, ys, word_dict, model, sess, show=100):
+def knit(xs, ys, word_dict, effect_list, model, sess, show=100):
 
     inv_dict = {}
     for k in word_dict.keys():
@@ -78,9 +83,13 @@ def knit(xs, ys, word_dict, model, sess, show=100):
         line += MAP[y]
         line += "<p>"
 
-        line += html_render([inv_dict[w] for w in x], alphas)
+        line += html_render(x, alphas, inv_dict, effect_list)
         line += "</p>"
+        line += "attention weights:"
         line += str(alphas)
+        line += "<p>effect list:"
+        line += str([effect_list[w] for w in x])
+        line += "</p>"
         line += "<p>"
         line += "###############################"
         line += "</p>"

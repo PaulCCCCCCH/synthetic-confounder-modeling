@@ -1,3 +1,3 @@
-python generate.py 50000 3 --rebuild
-python gen_txt.py
-python train.py
+python generate.py 100000 3 --rebuild --fil 3
+python train.py sentiment_model
+

@@ -11,6 +11,7 @@ parser.add_argument("numtogen", help="Input number of sample sentences to genera
 parser.add_argument("grams", help="Specify the number n in n-gram", type=int, default=3)
 
 parser.add_argument("--rebuild", action="store_true", default=False, help="Rebuild vocab and word effect")
+parser.add_argument("--filter_n", type=int, help="Consider only the subset of vocabulary that appeared greater than or equal to n times", default=0)
 
 args = parser.parse_args()
 
@@ -35,15 +36,19 @@ if not path.exists("data/vocab.pkl") or args.rebuild:
     text_list = ("".join(sentences).split())
     counts = list(Counter(text_list).viewitems())
     counts.sort(key=lambda x: x[1], reverse=True)
-    vocab_list = counts[:10000]
+    # Filter out least frequent words 
+    counts_filtered = [(x[0], x[1]) for x in counts if x[1] >= args.filter_n]
+    vocab_list = counts_filtered[:10000]
     vocab = dict(vocab_list)
 
+
     word_dict = dict()
-    
     word_dict["<pad>"] = 0
     for i, word in enumerate(vocab.keys()):
-        ip1 = i + 1
+        ip1 = i + 1 
         word_dict[word] = ip1
+    #del word_dict["$t$"]
+    #word_dict["$t$"] = 1
 
     f = open("data/vocab.pkl", "wb")
     pickle.dump(word_dict, f)
@@ -61,6 +66,7 @@ total_words = sum(vocab.values())
 
 embedding_matrix = np.array(uniform(-1,1,[vocab_size, EMB_DIM]))
 embedding_matrix[0] = np.zeros(EMB_DIM)
+embedding_matrix[1] = np.zeros(EMB_DIM)
 
 f = open("data/embedding_matrix.pkl", "wb")
 pickle.dump(embedding_matrix, f)
@@ -221,16 +227,24 @@ while generated < NUM_TO_GEN:
                 print("{} / {} generated".format(generated, NUM_TO_GEN))
             break
 
-
-print("showing first two examples")
+print("Showing first two examples")
 print(samples[0])
 print(samples[1])
 
 
 
+print("Writing output files")
 if not path.exists("./out"):
     mkdir("./out")
 
 f = open("./out/samples.pkl", "wb")
 pickle.dump(samples, f)
 f.close()
+
+f = open("out/samples.txt", "wb")
+for i in samples:
+    line = str(i["label"]) + " " + " ".join(i["sentence"]) + "\n"
+    f.write(line)
+f.close()
+
+print("All done")

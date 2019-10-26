@@ -1,15 +1,24 @@
 # Deconfounding Key-word Statistics 
 
-## Usage
-```python generate.py [num-to-gen] [ngram] [--rebuild]```
-then
-```python train.py```
-use ```python gen_txt.py``` to generate txt file of generated samples
+## Dependencies:
+- `tensorflow==1.14`
+- `nltk`
 
-Visualization can be found in `./out/vis.html`
+
+## Usage
+run `start.sh` or:
+
+```python generate.py [num-to-gen] [ngram] [--rebuild] [--filter_n]```
+then
+```python train.py [name] [--test]```
+
+Generated dataset can be found in `./out/samples.pkl`
+
+Visualization can be found in `./model/vis.html`
 
 ##### example: 
-```python generate.py 1000 3 --rebuild```
+- `python generate.py 1000 3 --rebuild`
+- `python train.py sentiment_model`
 
 
 ## Key variables
@@ -23,6 +32,28 @@ Visualization can be found in `./out/vis.html`
     * `bow_repr`: bag-of-word representation of the sentence (sum of each word as one-hot vectors)
     * `label`: 0 for negative, 1 for positive
   
+
+## Vocabulary sizes:
+```
+>>> len([0 for x in list(counts) if x[1] >= 2])
+2488
+>>> len([0 for x in list(counts) if x[1] >= 3])
+1891
+>>> len([0 for x in list(counts) if x[1] >= 4])
+1486
+>>> len([0 for x in list(counts) if x[1] >= 5])
+1227
+>>> len([0 for x in list(counts) if x[1] >= 6])
+1060
+>>> len([0 for x in list(counts) if x[1] >= 7])
+926
+>>> len([0 for x in list(counts) if x[1] >= 8])
+828
+>>> len([0 for x in list(counts) if x[1] >= 9])
+758
+>>> len([0 for x in list(counts) if x[1] >= 10])
+692
+```
 
 ## TODO:
 - Word effects should be calculated in a better way

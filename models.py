@@ -7,7 +7,7 @@ def attention_layer(inputs, attention_size):
     
 
 class SentimentModelWithAttention(object):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, is_train=True, attention_size=16):
+    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, is_train=True, attention_size=16, use_embedding=True, use_reg=False):
         self.batch_size = batch_size
         self.max_len = max_len
         self.lstm_size = lstm_size
@@ -16,6 +16,8 @@ class SentimentModelWithAttention(object):
         self.is_train = is_train
         self.vocab_size = vocab_size
         self.attention_size = attention_size
+        self.use_embedding = use_embedding
+        self.use_reg = use_reg
         self.build_model()
             
     
@@ -25,8 +27,12 @@ class SentimentModelWithAttention(object):
         self.y_holder = tf.placeholder(tf.int64, shape=[None])
         self.seq_len = tf.cast(tf.reduce_sum(tf.sign(self.x_holder), axis=1), tf.int32)
 
-        self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer(), trainable=False)
-        self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
+        if self.use_embedding:
+            self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer(), trainable=False)
+            self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
+        else:
+            self.embedding_w = tf.one_hot(list(range(self.vocab_size)), depth=self.vocab_size) 
+            self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
 
         lstm = tf.contrib.rnn.BasicLSTMCell(self.lstm_size)
         """
@@ -40,10 +46,9 @@ class SentimentModelWithAttention(object):
                                                     initial_state=self.init_state,
                                                     sequence_length=self.seq_len)
 
-        ########### MY CODE STARTS ########
-        self.w_omega = tf.get_variable('w_omega', initializer=tf.random_normal([self.lstm_size, self.attention_size], stddev=0.1))
-        self.b_omega = tf.get_variable('b_omega', initializer=tf.random_normal([self.attention_size], stddev=0.1))
-        self.u_omega = tf.get_variable('u_omega', initializer=tf.random_normal([self.attention_size], stddev=0.1))
+        self.w_omega = tf.get_variable('w_omega', initializer=tf.random_normal([self.lstm_size, self.attention_size]))
+        self.b_omega = tf.get_variable('b_omega', initializer=tf.random_normal([self.attention_size]))
+        self.u_omega = tf.get_variable('u_omega', initializer=tf.random_normal([self.attention_size]))
 
         self.value = tf.tanh(tf.tensordot(rnn_outputs, self.w_omega, axes=1) + self.b_omega)
 
@@ -51,8 +56,6 @@ class SentimentModelWithAttention(object):
         self.alphas = tf.nn.softmax(self.vu, name='alphas')
 
         last_output = tf.reduce_sum(rnn_outputs * tf.expand_dims(self.alphas, -1), 1)
-        ########### MY CODE ENDS ########
-
         """
         batch_size = tf.shape(rnn_outputs)[0]
         max_length = tf.shape(rnn_outputs)[1]
@@ -68,12 +71,25 @@ class SentimentModelWithAttention(object):
 
         if self.is_train:
             last_output = tf.nn.dropout(last_output, self.keep_probs)
-        self.w = tf.get_variable("w", shape=[self.lstm_size, 2], initializer=tf.truncated_normal_initializer(stddev=0.2))
+        self.w = tf.get_variable("w", shape=[self.lstm_size, 2], initializer=tf.truncated_normal_initializer())
         self.b = tf.get_variable("b", shape=[2], dtype=tf.float32)
         logits = tf.matmul(last_output, self.w) + self.b
         self.y = tf.nn.softmax(logits)
+
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.one_hot(self.y_holder, depth=2),logits=logits))
+
+        if self.use_reg:
+            print("using entropy regularization")
+            # Entropy regularization
+            self.epsilon = 1e-10
+            self.lam = 0.1
+            alphas_loss = self.alphas + self.epsilon
+            reg = tf.reduce_mean(-tf.reduce_sum(alphas_loss * tf.log(alphas_loss), axis=1))
+            self.cost = self.cost + reg
+
+
+
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
         
         if self.is_train:
@@ -91,13 +107,12 @@ class SentimentModelWithAttention(object):
             batch_idx = np.random.choice(train_x.shape[0], size=self.batch_size, replace=False)
             batch_xs = train_x[batch_idx,:]
             batch_ys = train_y[batch_idx]
-            batch_loss, _, batch_accuracy = sess.run([self.cost, self.train_op, self.accuracy],
+            batch_loss, _, batch_accuracy, temp = sess.run([self.cost, self.train_op, self.accuracy, self.alphas],
                                      feed_dict={self.x_holder: batch_xs,
                                                self.y_holder: batch_ys})
             epoch_loss += batch_loss
             epoch_accuracy += batch_accuracy
         return epoch_loss / batches_per_epoch, epoch_accuracy / batches_per_epoch
-            #print(batch_xs.shape)
         
     def predict(self, sess, test_x):
         pred_y, alphas = sess.run([self.y, self.alphas], feed_dict={self.x_holder: test_x})
@@ -114,3 +129,7 @@ class SentimentModelWithAttention(object):
             test_accuracy += np.sum(np.argmax(pred_ys, axis=1) == test_ys)
         test_accuracy /= (test_batches*self.batch_size)
         return test_accuracy
+
+
+
+
