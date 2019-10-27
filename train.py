@@ -22,7 +22,7 @@ train_size = 80000
 test_size = 1000
 batch_size = 10
 lstm_size = 20
-num_epochs = 1
+num_epochs = 20
 embedding_dim = 20
 
 #Loading data:
