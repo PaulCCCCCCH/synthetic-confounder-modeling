@@ -18,8 +18,8 @@ args = parser.parse_args()
 
 # Defining constants
 max_len = 30
-train_size = 400
-test_size = 100
+train_size = 80000
+test_size = 1000
 batch_size = 10
 lstm_size = 20
 num_epochs = 1
