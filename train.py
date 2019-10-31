@@ -12,14 +12,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("modelname", help="specify the name of the model", type=str)
 
 parser.add_argument("--test", action="store_true", default=False, help="Only test and produce visualisation")
-
+parser.add_argument("--lam", type=float, default=0, help="Coefficient of regularization term")
+parser.add_argument("--reg_method", type=str, default="none", help="Specify regularization method. Choose from ['none', 'weight', 'entropy']. Default is 'none'")
 
 args = parser.parse_args()
 
 # Defining constants
 max_len = 30
-train_size = 80000
-test_size = 1000
 batch_size = 10
 lstm_size = 20
 num_epochs = 20
@@ -35,6 +34,10 @@ print("Loading dataset")
 f = open("out/samples.pkl", "rb")
 samples = pickle.load(f)
 f.close()
+
+total_size = len(samples)
+train_size = int(total_size * 0.9)
+test_size = total_size - train_size
 
 
 f = open('data/effect_list.pkl', 'rb') 
@@ -56,22 +59,25 @@ test_y = all_y[train_size: train_size+test_size]
 
 sess = tf.Session()
 print("Buidling the model")
-model = models.SentimentModelWithAttention(batch_size=batch_size,
+model = models.SentimentModelWithSparseAttention(batch_size=batch_size,
                        lstm_size = lstm_size,
                        max_len = max_len,
                        keep_probs=0.8,
                        embeddings_dim=embedding_matrix.shape[1], vocab_size=embedding_matrix.shape[0],
                        is_train=True,
-                       use_reg = True)
+                       reg="none",
+                       lam=args.lam)
 
 
 sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
-ckpt_file = "model/" + args.modelname
-if args.test:  
-    # TODO
+ckpt_dir = "./models/" + args.modelname + "/"
+ckpt_file = ckpt_dir + args.modelname
+if args.test:
     saver.restore(sess, ckpt_file)
     print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
+
+
 else:
     sess.run(tf.assign(model.embedding_w, embedding_matrix))
 
@@ -85,8 +91,8 @@ else:
         print(i,'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
         #print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
         print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
-    if not os.path.exists('model'):
-        os.mkdir('model')
+    if not os.path.exists(ckpt_dir):
+        os.mkdir(ckpt_dir)
 
     print("Saving the model")
     saver.save(sess, ckpt_file)
@@ -95,7 +101,7 @@ else:
 
 print("Producing visualization")
 htmls = vis_util.knit(test_x, test_y, word_dict, effect_list, model, sess, 100)
-f = open("model/vis.html", "wb")
+f = open(ckpt_dir + "vis.html", "wb")
 for i in htmls:
     f.write(i)
 f.close()

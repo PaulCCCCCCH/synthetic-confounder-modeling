@@ -1,0 +1,2 @@
+model_checkpoint_path: "attention_weight_lam0.1"
+all_model_checkpoint_paths: "attention_weight_lam0.1"
