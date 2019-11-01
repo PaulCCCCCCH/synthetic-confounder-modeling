@@ -6,3 +6,5 @@ out/
 .vscode/
 .idea/
 trial.py
+!out_debug/samples.pkl
+models/debug/

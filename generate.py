@@ -11,7 +11,8 @@ parser.add_argument("numtogen", help="Input number of sample sentences to genera
 parser.add_argument("grams", help="Specify the number n in n-gram", type=int, default=3)
 
 parser.add_argument("--rebuild", action="store_true", default=False, help="Rebuild vocab and word effect")
-parser.add_argument("--filter_n", type=int, help="Consider only the subset of vocabulary that appeared greater than or equal to n times", default=0)
+parser.add_argument("--filter_n", type=int, help="Consider only the subset of vocabulary that appeared greater than or equal to n times", default=3)
+parser.add_argument("--outdir", default="./out", help="Define output path")
 
 args = parser.parse_args()
 
@@ -40,7 +41,6 @@ if not path.exists("data/vocab.pkl") or args.rebuild:
     counts_filtered = [(x[0], x[1]) for x in counts if x[1] >= args.filter_n]
     vocab_list = counts_filtered[:10000]
     vocab = dict(vocab_list)
-
 
     word_dict = dict()
     word_dict["<pad>"] = 0
@@ -234,14 +234,14 @@ print(samples[1])
 
 
 print("Writing output files")
-if not path.exists("./out"):
-    mkdir("./out")
+if not path.exists(args.outdir):
+    mkdir(args.outdir)
 
-f = open("./out/samples.pkl", "wb")
+f = open(args.outdir + "/samples.pkl", "wb")
 pickle.dump(samples, f)
 f.close()
 
-f = open("out/samples.txt", "wb")
+f = open(args.outdir + "/samples.txt", "wb")
 for i in samples:
     line = str(i["label"]) + " " + " ".join(i["sentence"]) + "\n"
     f.write(line)

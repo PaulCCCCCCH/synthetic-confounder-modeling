@@ -54,6 +54,18 @@ class Model(object):
         test_accuracy /= (test_batches * self.batch_size)
         return test_accuracy
 
+    def evaluate_capturing(self, sess, test_x, test_y, effect_dict):
+        test_batches = test_x.shape[0] // self.batch_size
+        score = 0
+        for i in range(test_batches):
+            test_idx = range(i * self.batch_size, (i + 1) * self.batch_size)
+            test_xs = test_x[test_idx, :]
+            test_ys = test_y[test_idx]
+            pred_ys, alphas = self.predict(sess, test_xs)
+            effects = np.asarray([[effect_dict[w] for w in sentence] for sentence in test_xs])
+            factor = np.mean(np.sum(np.multiply(alphas, effects), axis=1))
+            score += factor
+        return score / test_batches
 
 class SentimentModelWithRegAttention(Model):
     def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, is_train=True, attention_size=16, use_embedding=True, reg="none", lam=None):
@@ -138,12 +150,8 @@ class SentimentModelWithRegAttention(Model):
             reg = self.lam * tf.reduce_mean(tf.reduce_sum(alphas_loss * alphas_loss), axis=1)
             self.cost = self.cost + reg
 
-        elif self.reg == "none":
-            print("using no regularization")
-
         else:
-            raise NotImplementedError("Invalid regularization method")
-
+            print("using no regularization")
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
         
@@ -196,7 +204,10 @@ class SentimentModelWithSparseAttention(Model):
 
         # Use sparsemax instead of softmax
         # self.alphas = tf.nn.softmax(self.vu, name='alphas')
-        self.alphas = self.vu / tf.expand_dims(tf.reduce_sum(tf.math.multiply(self.vu, self.vu), axis=1), 1)
+        self.alphas = tf.contrib.sparsemax.sparsemax(self.vu, name='alphas')
+
+        # Normalised attention
+        #self.alphas = self.vu / tf.expand_dims(tf.reduce_sum(tf.math.multiply(self.vu, self.vu), axis=1), 1)
 
         last_output = tf.reduce_sum(rnn_outputs * tf.expand_dims(self.alphas, -1), 1)
 
@@ -209,16 +220,7 @@ class SentimentModelWithSparseAttention(Model):
         self.y = tf.nn.softmax(self.logits)
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
-
-        if self.reg:
-            print("using entropy regularization")
-            # Entropy regularization
-            self.epsilon = 1e-10
-            self.lam = 0.1
-            alphas_loss = self.alphas + self.epsilon
-            reg = self.lam * tf.reduce_mean(-tf.reduce_sum(alphas_loss * tf.log(alphas_loss), axis=1))
-            self.cost = self.cost + reg
+            labels=tf.one_hot(self.y_holder, depth=2), logits=self.y))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
@@ -227,3 +229,5 @@ class SentimentModelWithSparseAttention(Model):
             self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
             self.train_op = self.optimizer.minimize(self.cost)
 
+def _to_effect_list(batch, effect_list):
+    return

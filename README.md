@@ -1,24 +1,25 @@
 # Deconfounding Key-word Statistics 
 
 ## Dependencies:
-- `tensorflow==1.14`
+- `tensorflow==1.15`
 - `nltk`
+- `keras`
 
 
 ## Usage
 run `start.sh` or:
 
-```python generate.py [num-to-gen] [ngram] [--rebuild] [--filter_n]```
+```python generate.py [num-to-gen] [ngram] [--outdir] [--rebuild] [--filter_n] [--debug]```
 then
-```python train.py [name] [--test]```
+```python train.py [name] [--test] [--debug] [--lam] [--reg_method] [--epochs]```
 
-Generated dataset can be found in `./out/samples.pkl`
+Generated dataset can be found in `./${outdir}/samples.pkl`
 
-Visualization can be found in `./model/vis.html`
+Visualization can be found in `./models/${name}/vis.html`
 
 ##### example: 
-- `python generate.py 1000 3 --rebuild`
-- `python train.py sentiment_model`
+- `python generate.py 1000 3 --rebuild --filter_n 2`
+- `python train.py sentiment_model --reg_method weight`
 
 
 ## Key variables
