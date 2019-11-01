@@ -62,7 +62,7 @@ class Model(object):
             test_xs = test_x[test_idx, :]
             test_ys = test_y[test_idx]
             pred_ys, alphas = self.predict(sess, test_xs)
-            effects = np.asarray([[effect_dict[w] for w in sentence] for sentence in test_xs])
+            effects = np.asarray([[abs(effect_dict[w]) for w in sentence] for sentence in test_xs])
             factor = np.mean(np.sum(np.multiply(alphas, effects), axis=1))
             score += factor
         return score / test_batches
@@ -133,8 +133,10 @@ class SentimentModelWithRegAttention(Model):
         self.logits = tf.matmul(last_output, self.w) + self.b
         self.y = tf.nn.softmax(self.logits)
 
+        # WARNING: This op expects unscaled logits, since it performs a softmax on logits internally for efficiency.
+        # Do not call this op with the output of softmax, as it will produce incorrect results.
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2),logits=self.y))
+            labels=tf.one_hot(self.y_holder, depth=2),logits=self.logits))
 
         if self.reg == "entropy":
             print("using entropy regularization")
@@ -147,7 +149,7 @@ class SentimentModelWithRegAttention(Model):
             print("using weight regularization")
             # Weight regularization
             alphas_loss = self.alphas + self.epsilon
-            reg = self.lam * tf.reduce_mean(tf.reduce_sum(alphas_loss * alphas_loss), axis=1)
+            reg = self.lam * tf.reduce_mean(tf.reduce_sum(alphas_loss * alphas_loss, axis=1))
             self.cost = self.cost + reg
 
         else:
@@ -220,7 +222,7 @@ class SentimentModelWithSparseAttention(Model):
         self.y = tf.nn.softmax(self.logits)
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.y))
+            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 

@@ -13,7 +13,7 @@ parser.add_argument("modelname", help="specify the name of the model", type=str)
 
 parser.add_argument("--test", action="store_true", default=False, help="Only test and produce visualisation")
 parser.add_argument("--debug", action="store_true", default=False, help="Use debug dataset for quick debug runs")
-parser.add_argument("--lam", type=float, default=0, help="Coefficient of regularization term")
+parser.add_argument("--lam", type=float, default=0.1, help="Coefficient of regularization term")
 parser.add_argument("--reg_method", type=str, default="none", help="Specify regularization method. Choose from ['none', 'weight', 'entropy', 'sparse']. Default is 'none'")
 parser.add_argument("--epochs", type=int, default=21, help="Specify epochs to train")
 
@@ -105,6 +105,7 @@ else:
         print(i,'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
         #print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
         print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
+        print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
     if not os.path.exists(ckpt_dir):
         os.mkdir(ckpt_dir)
 
