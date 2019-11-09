@@ -6,6 +6,8 @@ import numpy as np
 import os
 import vis_util
 import argparse
+import sys
+import time
 
 parser = argparse.ArgumentParser()
 
@@ -25,6 +27,23 @@ batch_size = 10
 lstm_size = 20
 num_epochs = args.epochs
 embedding_dim = 20
+
+# Defining directories
+ckpt_dir = os.path.join("models", args.modelname)
+ckpt_file = os.path.join(ckpt_dir, args.modelname)
+log_file = os.path.join(ckpt_dir, "log.txt")
+if not os.path.exists(ckpt_dir):
+    os.mkdir(ckpt_dir)
+
+# Redirect output to log file
+log_fh = open(log_file, "a")
+# sys.stdout = log_fh
+
+# Print a summary of parameters
+print("\n\n Started at " + str(time.ctime()))
+print("Parameter summary")
+print(args.__dict__)
+
 
 #Loading data:
 print("Loading vocabulary")
@@ -68,25 +87,19 @@ test_y = all_y[train_size: train_size+test_size]
 sess = tf.Session()
 print("Buidling the model. Model name: {}".format(args.modelname))
 
-if args.reg_method == 'sparse':
-    init = models.SentimentModelWithSparseAttention
-else:
-    init = models.SentimentModelWithRegAttention
-
-model = init(batch_size=batch_size,
+model = models.LSTMPredModelWithMLPKeyWordModelAdvTrain(batch_size=batch_size,
                        lstm_size = lstm_size,
                        max_len = max_len,
                        keep_probs=0.8,
                        embeddings_dim=embedding_matrix.shape[1], vocab_size=embedding_matrix.shape[0],
-                       is_train=True,
                        reg=args.reg_method,
-                       lam=args.lam)
+                       lam=args.lam,
+                       sparse=args.reg_method == "sparse")
 
 
 sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
-ckpt_dir = "./models/" + args.modelname + "/"
-ckpt_file = ckpt_dir + args.modelname
+
 if args.test:
     saver.restore(sess, ckpt_file)
     print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
@@ -116,10 +129,10 @@ else:
 
 print("Producing visualization")
 htmls = vis_util.knit(test_x, test_y, word_dict, effect_list, model, sess, 100)
-f = open(ckpt_dir + "vis.html", "wb")
+f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
 for i in htmls:
     f.write(i)
 f.close()
 
-
+log_fh.close()
 
