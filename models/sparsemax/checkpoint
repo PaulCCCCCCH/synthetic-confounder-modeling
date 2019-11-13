@@ -1,2 +1,0 @@
-model_checkpoint_path: "sparsemax"
-all_model_checkpoint_paths: "sparsemax"

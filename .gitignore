@@ -2,8 +2,9 @@
 venv/
 *.swp
 *.pyc
-out/
 .vscode/
 .idea/
 trial.py
 models/debug/
+data/samples.pkl
+data/samples.txt

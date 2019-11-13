@@ -12,7 +12,7 @@ parser.add_argument("grams", help="Specify the number n in n-gram", type=int, de
 
 parser.add_argument("--rebuild", action="store_true", default=False, help="Rebuild vocab and word effect")
 parser.add_argument("--filter_n", type=int, help="Consider only the subset of vocabulary that appeared greater than or equal to n times", default=3)
-parser.add_argument("--outdir", default="./out", help="Define output path")
+parser.add_argument("--outdir", default="./data", help="Define output path")
 
 args = parser.parse_args()
 
@@ -21,8 +21,8 @@ NUM_TO_GEN = args.numtogen
 EMB_DIM = 20
 
 # Reading files
-fs = open("data/s.txt", "rb")
-fl = open("data/l.txt", "rb")
+fs = open("data/orig_sentences.txt", "rb")
+fl = open("data/orig_labels.txt", "rb")
 sentences = fs.readlines()
 sentences = [s.lower() for s in sentences]
 labels = list(map(int, fl.readlines()))

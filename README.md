@@ -7,20 +7,12 @@
 
 
 ## Usage
-run `start.sh` or:
-
-```python generate.py [num-to-gen] [ngram] [--outdir] [--rebuild] [--filter_n] [--debug]```
-then
-```python train.py [name] [--test] [--debug] [--lam] [--reg_method] [--epochs]```
+run `start.sh` or run `generate.py` and then `main.py`.
+See parameters using main.py -h
 
 Generated dataset can be found in `./${outdir}/samples.pkl`
 
 Visualization can be found in `./models/${name}/vis.html`
-
-##### example: 
-- `python generate.py 1000 3 --rebuild --filter_n 2`
-- `python train.py sentiment_model --reg_method weight`
-
 
 ## Key variables
 - `word_dict`: mapping from word(str) to index(int)

@@ -1,0 +1,2 @@
+model_checkpoint_path: "entropy_reg"
+all_model_checkpoint_paths: "entropy_reg"
