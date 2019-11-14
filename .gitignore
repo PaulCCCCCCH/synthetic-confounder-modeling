@@ -8,3 +8,5 @@ trial.py
 models/debug/
 data/samples.pkl
 data/samples.txt
+.DS_Store
+*/.DS_Store

@@ -62,16 +62,20 @@ class AdditiveModel(object):
         self.keyword_model = keyword_model
         assert self.pred_model.batch_size == self.keyword_model.batch_size
         self.batch_size = self.pred_model.batch_size
+        self.use_alphas = False
+        if self.pred_model.use_alphas:
+            self.use_alphas = True
+            self.alphas = self.pred_model.alphas
         self.build_model()
 
     def build_model(self):
-        self.logits = self.pred_model.logits + self.keyword_model.logits
+        self.logits = self.pred_model.logits + tf.stop_gradient(self.keyword_model.logits)
         self.y = tf.nn.softmax(self.logits)
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.one_hot(self.pred_model.y_holder, depth=2), logits=self.logits))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.pred_model.y_holder, tf.argmax(self.pred_model.y, 1)), tf.float32))
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.pred_model.learning_rate)
         self.train_op = self.optimizer.minimize(self.cost)
 
 
@@ -93,6 +97,10 @@ class AdditiveModel(object):
             epoch_accuracy += batch_accuracy
         return epoch_loss / batches_per_epoch, epoch_accuracy / batches_per_epoch
 
+    def predict_no_alphas(self, sess, test_x):
+        pred_y = sess.run(self.pred_model.y, feed_dict={self.pred_model.x_holder: test_x})
+        return pred_y
+
     def predict(self, sess, test_x):
         pred_y, alphas = sess.run([self.pred_model.y, self.pred_model.alphas], feed_dict={self.pred_model.x_holder: test_x})
         return pred_y, alphas
@@ -104,7 +112,7 @@ class AdditiveModel(object):
             test_idx = range(i * self.batch_size, (i + 1) * self.batch_size)
             test_xs = test_x[test_idx, :]
             test_ys = test_y[test_idx]
-            pred_ys, alphas = self.predict(sess, test_xs)
+            pred_ys = self.predict_no_alphas(sess, test_xs)
             test_accuracy += np.sum(np.argmax(pred_ys, axis=1) == test_ys)
         test_accuracy /= (test_batches * self.batch_size)
         return test_accuracy
@@ -124,15 +132,16 @@ class AdditiveModel(object):
 
 class Model(object):
     def __init__(self, batch_size=10, max_len=30, vocab_size=10000, embeddings_dim=20,
-                 use_embedding=True, reg=None, trainable=True):
+                 use_embedding=True, reg=None, learning_rate=0.1):
         self.batch_size = batch_size
         self.max_len = max_len
         self.emb_dim = embeddings_dim
         self.vocab_size = vocab_size
         self.use_embedding = use_embedding
         self.reg = reg
+        self.use_alphas = False
+        self.learning_rate = learning_rate
         self.build_inputs()
-        self.trainable = trainable
         self.build_embedding()
 
     def build_model(self):
@@ -154,9 +163,14 @@ class Model(object):
             epoch_accuracy += batch_accuracy
         return epoch_loss / batches_per_epoch, epoch_accuracy / batches_per_epoch
 
+    def predict_no_alphas(self, sess, test_x):
+        pred_y = sess.run(self.y, feed_dict={self.x_holder: test_x})
+        return pred_y
+
     def predict(self, sess, test_x):
         pred_y, alphas = sess.run([self.y, self.alphas], feed_dict={self.x_holder: test_x})
         return pred_y, alphas
+
 
     def evaluate_accuracy(self, sess, test_x, test_y):
         test_accuracy = 0.0
@@ -165,7 +179,7 @@ class Model(object):
             test_idx = range(i * self.batch_size, (i + 1) * self.batch_size)
             test_xs = test_x[test_idx, :]
             test_ys = test_y[test_idx]
-            pred_ys, alphas = self.predict(sess, test_xs)
+            pred_ys = self.predict_no_alphas(sess, test_xs)
             test_accuracy += np.sum(np.argmax(pred_ys, axis=1) == test_ys)
         test_accuracy /= (test_batches * self.batch_size)
         return test_accuracy
@@ -191,7 +205,7 @@ class Model(object):
 
     def build_embedding(self):
         if self.use_embedding:
-            self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer(), trainable=True)
+            self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer())
             self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
         else:
             self.embedding_w = tf.one_hot(list(range(self.vocab_size)), depth=self.vocab_size)
@@ -199,8 +213,8 @@ class Model(object):
 
 
 class RegAttention(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, trainable=True):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, trainable=trainable)
+    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, learning_rate=0.1):
+        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
         self.lstm_size = lstm_size
         self.attention_size = attention_size
         self.reg = reg
@@ -208,6 +222,7 @@ class RegAttention(Model):
         self.epsilon = 1e-10
         self.sparse = sparse
         self.keep_probs = keep_probs
+        self.use_alphas = True
         self.build_model()
 
     def build_model(self):
@@ -236,17 +251,14 @@ class RegAttention(Model):
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
         
-        if not self.trainable:
-            self.train_op = self.cost
-        else:
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
-            self.train_op = self.optimizer.minimize(self.cost)
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
 
 
 class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
     def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, trainable=True):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, trainable=trainable)
+                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
+        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
         self.lstm_size = lstm_size
         self.attention_size = attention_size
         self.reg = reg
@@ -254,6 +266,7 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
         self.kwm_lstm_size = kwm_lstm_size
         self.sparse = sparse
         self.keep_probs = keep_probs
+        self.use_alphas = True
         self.build_model()
 
 
@@ -292,18 +305,15 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
-        if not self.trainable:
-            self.train_op = self.cost
-        else:
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
-            self.train_op = self.optimizer.minimize(self.cost)
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
 
 
 
 class LSTMPredModel(Model):
     def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, trainable=True):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, trainable=trainable)
+                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
+        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
         self.lstm_size = lstm_size
         self.attention_size = attention_size
         self.reg = reg
@@ -311,6 +321,7 @@ class LSTMPredModel(Model):
         self.kwm_lstm_size = kwm_lstm_size
         self.sparse = sparse
         self.keep_probs = keep_probs
+        self.use_alphas = True
         self.build_model()
 
 
@@ -334,18 +345,15 @@ class LSTMPredModel(Model):
             labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
-        if not self.trainable:
-            self.train_op = self.cost
-        else:
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
-            self.train_op = self.optimizer.minimize(self.cost)
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
 
 
 
 class MLPPredModel(Model):
     def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, trainable=True):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, trainable=trainable)
+                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
+        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
         self.lstm_size = lstm_size
         self.attention_size = attention_size
         self.reg = reg
@@ -353,27 +361,21 @@ class MLPPredModel(Model):
         self.kwm_lstm_size = kwm_lstm_size
         self.sparse = sparse
         self.keep_probs = keep_probs
+        self.use_alphas = False
         self.build_model()
 
 
     def build_model(self):
         inputs = tf.reshape(self.e, [-1, self.e.shape[1] * self.e.shape[2]])
-        w = tf.get_variable("w", shape=[inputs.shape[-1], 2],
-                            initializer=tf.truncated_normal_initializer())
-        b = tf.get_variable("b", shape=[2], dtype=tf.float32)
 
-        self.logits = tf.matmul(inputs, w) + b
+        self.logits = dense_layer(inputs, 2, name="pred_out", activation=None)
 
-        self.alphas = tf.reduce_mean(tf.reshape(w, shape=[-1, self.max_len, self.emb_dim]), axis=-1)
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
 
-        if not self.trainable:
-            self.train_op = self.cost
-        else:
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
-            self.train_op = self.optimizer.minimize(self.cost)
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
 
         self.y = tf.nn.softmax(self.logits)
 
@@ -383,8 +385,8 @@ class MLPPredModel(Model):
 
 class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
     def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=10, trainable=True):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, trainable=trainable)
+                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=10, learning_rate=0.1):
+        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
         self.lstm_size = lstm_size
         self.attention_size = attention_size
         self.reg = reg
@@ -392,6 +394,7 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
         self.kwm_lstm_size = kwm_lstm_size
         self.sparse = sparse
         self.keep_probs = keep_probs
+        self.use_alphas = True
         self.build_model()
 
     def build_model(self):
@@ -477,15 +480,12 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
         reg = get_reg(self.kwm_alphas, lam=self.lam, type=self.reg)
         self.cost += reg
 
-        if not self.trainable:
-            self.train_op = self.cost
-        else:
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0)
-            self.train_op = self.optimizer.minimize(self.cost)
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
 
-def get_model(args, all_models, vocab_size, trainable=True):
+def get_model(args, all_models, vocab_size):
     init = all_models[args.modeltype]
     model = init(batch_size=args.batch_size,
                  lstm_size=args.lstm_size,
@@ -496,7 +496,7 @@ def get_model(args, all_models, vocab_size, trainable=True):
                  reg=args.reg_method,
                  lam=args.lam,
                  sparse=args.reg_method == "sparse",
-                 trainable=trainable)
+                 learning_rate=args.learning_rate)
     return model
 
 

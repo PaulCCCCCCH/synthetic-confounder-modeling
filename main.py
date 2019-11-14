@@ -1,38 +1,13 @@
 import pickle
-from keras.preprocessing.sequence import pad_sequences
 import tensorflow as tf
 import models
-import numpy as np
 import os
 import vis_util
 import argparse
 import sys
 import time
 from load_data import load_all_data, load_file
-
-
-def initialize_uninitialized_global_variables(sess):
-    """
-    Only initializes the variables of a TensorFlow session that were not
-    already initialized.
-    :param sess: the TensorFlow session
-    :return:
-    """
-    # List all global variables
-    global_vars = tf.global_variables()
-
-    # Find initialized status for all variables
-    is_var_init = [tf.is_variable_initialized(var) for var in global_vars]
-    is_initialized = sess.run(is_var_init)
-
-    # List all variables that were not initialized previously
-    not_initialized_vars = [var for (var, init) in
-                            zip(global_vars, is_initialized) if not init]
-
-    # Initialize all uninitialized variables found, if any
-    if len(not_initialized_vars):
-        sess.run(tf.variables_initializer(not_initialized_vars))
-    return
+import utils
 
 
 all_models = {
@@ -40,7 +15,7 @@ all_models = {
     'adv_mlp': models.LSTMPredModelWithMLPKeyWordModelAdvTrain,
     'hex_attention': models.LSTMPredModelWithRegAttentionKeyWordModelHEX,
     'baseline_lstm': models.LSTMPredModel,
-    #'baseline_mlp': models.MLPPredModel  # Currently not working
+    'baseline_mlp': models.MLPPredModel
 }
 model_types = all_models.keys()
 
@@ -62,6 +37,7 @@ parser.add_argument("--embedding_dim", type=int, default=20, help="Dimension of 
 parser.add_argument("--data_path", type=str, default="./data", help="Specify data directory (where inputs, effect list, vocabulary, etc. are )")
 parser.add_argument("--batch_size", type=int, default=10)
 parser.add_argument("--keep_probs", type=float, default=0.8, help="Keep probability of dropout layers. Set it to 1.0 to disable dropout.")
+parser.add_argument("--learning_rate", type=float, default=0.1)
 
 args = parser.parse_args()
 if args.modeltype not in model_types:
@@ -93,8 +69,8 @@ num_epochs = args.epochs
 embedding_dim = args.embedding_dim
 
 # Redirect output to log file
-log_fh = open(log_file, "a")
-# sys.stdout = log_fh
+logger = utils.Logger(log_file)
+sys.stdout = logger
 
 # Print a summary of parameters
 print("\n\n Started at " + str(time.ctime()))
@@ -119,7 +95,7 @@ if args.kwm_path != "":
     print(prev_args.__dict__)
 
     with tf.variable_scope(prev_args.modelname) as scope:
-        key_word_model = models.get_model(prev_args, all_models, vocab_size, trainable=False)
+        key_word_model = models.get_model(prev_args, all_models, vocab_size)
     kwm_saver = tf.train.Saver()
 
     kwm_ckpt = os.path.join(args.kwm_path, prev_args.modelname)
@@ -130,7 +106,6 @@ if args.kwm_path != "":
 with tf.variable_scope(args.modelname) as scope:
     pred_model = models.get_model(args, all_models, vocab_size)
 
-
 saver = tf.train.Saver()
 
 if use_additive:
@@ -138,8 +113,7 @@ if use_additive:
 else:
     model = pred_model
 
-initialize_uninitialized_global_variables(sess)
-
+utils.initialize_uninitialized_global_variables(sess)
 
 print("Buidling the model. Model name: {}".format(args.modelname))
 
@@ -161,8 +135,10 @@ else:
         epoch_loss, epoch_accuracy = model.train_for_epoch(sess, train_x, train_y)
         print(i,'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
         #print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
+        print(sess.run(tf.all_variables()[0][0]))
         print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
-        print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
+        if model.use_alphas:
+            print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
     if not os.path.exists(ckpt_dir):
         os.mkdir(ckpt_dir)
 
@@ -171,13 +147,13 @@ else:
     print("Finished")
 
 
-print("Producing visualization")
-htmls = vis_util.knit(test_x, test_y, word_dict, effect_list, model, sess, 100)
-f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
-for i in htmls:
-    f.write(i)
-f.close()
+if model.use_alphas:
+    print("Producing visualization")
+    htmls = vis_util.knit(test_x, test_y, word_dict, effect_list, model, sess, 100)
+    f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
+    for i in htmls:
+        f.write(i)
+    f.close()
 
-log_fh.close()
 
 

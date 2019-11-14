@@ -1,0 +1,2 @@
+model_checkpoint_path: "keyword_model_sparse_attention"
+all_model_checkpoint_paths: "keyword_model_sparse_attention"

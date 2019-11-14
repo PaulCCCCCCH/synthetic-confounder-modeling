@@ -1,0 +1,2 @@
+model_checkpoint_path: "additive_lstm_entropy_reg_attention"
+all_model_checkpoint_paths: "additive_lstm_entropy_reg_attention"

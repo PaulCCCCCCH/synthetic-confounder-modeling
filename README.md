@@ -8,7 +8,7 @@
 
 ## Usage
 run `start.sh` or run `generate.py` and then `main.py`.
-See parameters using main.py -h
+See parameters using `python generate.py -h` and `python main.py -h`
 
 Generated dataset can be found in `./${outdir}/samples.pkl`
 
