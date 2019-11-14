@@ -135,7 +135,7 @@ else:
         epoch_loss, epoch_accuracy = model.train_for_epoch(sess, train_x, train_y)
         print(i,'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
         #print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
-        print(sess.run(tf.all_variables()[0][0]))
+        #print(sess.run(tf.all_variables()[0][0]))
         print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
         if model.use_alphas:
             print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
