@@ -1,5 +1,5 @@
 # Generate dataset of size 100000 using 3-grams, filter out words appeared less than 3 times
-# python generate.py 100000 3 --rebuild --fil 3 --outdir ./data
+python generate.py 100000 3 --rebuild --fil 3 --outdir ./data
 
 # Train a keyword model using mlp
 python main.py reg_attention keyword_model_entropy_reg_attention \

@@ -51,7 +51,5 @@ print(args.__dict__)
 
 #Loading data:
 
-################################Start runner here ############################
 runner.run(args, ckpt_dir, ckpt_file)
-
 
