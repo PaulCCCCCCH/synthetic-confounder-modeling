@@ -5,10 +5,14 @@
 - `nltk`
 - `keras`
 
-
-## Usage
-run `start.sh` or run `generate.py` and then `main.py`.
+## Running models on synthetic dataset
+run `runner_synthetic.sh` or run `generate.py` and then `main.py`.
 See parameters using `python generate.py -h` and `python main.py -h`
+
+## Runing models on nli dataset:
+run `runner_nli.sh`
+**Important**: Please make sure that all json files (both snli and mnli) are in one directory. Use version 1.0 for snli
+and 0.9 for mnli.
 
 Generated dataset can be found in `./${outdir}/samples.pkl`
 
@@ -49,7 +53,7 @@ Visualization can be found in `./models/${name}/vis.html`
 ```
 
 ## TODO:
-- Word effects should be calculated in a better way
-
+Loading mnli dataset repetitive work
+Visualization for snli
 
 

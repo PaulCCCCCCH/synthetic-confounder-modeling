@@ -1,59 +1,6 @@
 import tensorflow as tf
 import numpy as np
-
-
-# Input must be of shape (Batch, TimeStep, HiddenSize)
-def attention_layer(attention_size, inputs, name, sparse=False):
-    w_omega = tf.get_variable('w_omega_'+name, initializer=tf.random_normal([int(inputs.shape[-1]), attention_size]))
-    b_omega = tf.get_variable('b_omega_'+name, initializer=tf.random_normal([attention_size]))
-    u_omega = tf.get_variable('u_omega_'+name, initializer=tf.random_normal([attention_size]))
-
-    value = tf.tanh(tf.tensordot(inputs, w_omega, axes=1) + b_omega)
-
-    vu = tf.tensordot(value, u_omega, axes=1, name='vu_'+name)
-    if sparse:
-        print("Using sparsemax attention")
-        alphas = tf.contrib.sparsemax.sparsemax(vu, name='alphas_'+name)
-    else:
-        alphas = tf.nn.softmax(vu, name='alphas_'+name)
-    last_output = tf.reduce_sum(inputs * tf.expand_dims(alphas, -1), 1)
-
-    return last_output, alphas
-
-
-def dense_layer(inputs, out_dim, name, activation=None):
-    w = tf.get_variable("w_" + name, shape=[inputs.shape[-1], out_dim], initializer=tf.truncated_normal_initializer())
-    b = tf.get_variable("b_" + name, shape=[out_dim], dtype=tf.float32)
-
-    layer = tf.matmul(inputs, w) + b
-
-    act = {
-        "sigmoid": tf.nn.sigmoid,
-        "relu": tf.nn.relu,
-        "tanh": tf.nn.tanh,
-    }
-    if activation is not None:
-        layer = act[activation](layer)
-    return layer
-
-
-def get_reg(alphas, lam=0, type=""):
-    alphas_loss = alphas + 1e-10
-    reg = 0
-    if type == "entropy":
-        print("using entropy regularization for attention weights")
-        # Entropy regularization
-        reg = lam * tf.reduce_mean(-tf.reduce_sum(alphas_loss * tf.log(alphas_loss), axis=1))
-
-    elif type == "weight":
-        print("using weight regularization for attention weights")
-        # Weight regularization
-        reg = lam * tf.reduce_mean(tf.reduce_sum(alphas_loss * alphas_loss, axis=1))
-
-    else:
-        print("using no regularization for attention weights")
-
-    return reg
+from model_utils import dense_layer, attention_layer, get_reg, lstm_layer
 
 
 class AdditiveModel(object):
@@ -206,10 +153,10 @@ class Model(object):
     def build_embedding(self):
         if self.use_embedding:
             self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer())
-            self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
         else:
             self.embedding_w = tf.one_hot(list(range(self.vocab_size)), depth=self.vocab_size)
-            self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
+
+        self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
 
 
 class RegAttention(Model):
@@ -228,12 +175,8 @@ class RegAttention(Model):
     def build_model(self):
         # shape = (batch_size, sentence_length, emb_dim)
 
-        lstm = tf.contrib.rnn.BasicLSTMCell(self.lstm_size)
-        self.init_state = lstm.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell=lstm,
-                                                    inputs=self.e,
-                                                    initial_state=self.init_state,
-                                                    sequence_length=self.seq_len)
+
+        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "encoder", sparse=self.sparse)
 
@@ -250,7 +193,7 @@ class RegAttention(Model):
 
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
-        
+
         self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.cost)
 
@@ -272,12 +215,7 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
 
     def build_model(self):
 
-        lstm = tf.contrib.rnn.BasicLSTMCell(self.lstm_size)
-        self.init_state = lstm.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell=lstm,
-                                                     inputs=self.e,
-                                                     initial_state=self.init_state,
-                                                     sequence_length=self.seq_len)
+        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "pred_encoder", sparse=self.sparse)
 
@@ -327,12 +265,7 @@ class LSTMPredModel(Model):
 
     def build_model(self):
 
-        lstm = tf.contrib.rnn.BasicLSTMCell(self.lstm_size)
-        self.init_state = lstm.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell=lstm,
-                                                     inputs=self.e,
-                                                     initial_state=self.init_state,
-                                                     sequence_length=self.seq_len)
+        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "pred_encoder", sparse=self.sparse)
 
@@ -400,25 +333,13 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
     def build_model(self):
 
         # Define prediction rnn
-        lstm = tf.contrib.rnn.BasicLSTMCell(self.lstm_size)
-        self.init_state = lstm.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell=lstm,
-                                                     inputs=self.e,
-                                                     initial_state=self.init_state,
-                                                     sequence_length=self.seq_len,
-                                                     scope="pred")
+        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "pred_encoder")
         #last_output = tf.nn.dropout(last_output, self.keep_probs)
 
         # Define key-word model rnn
-        kwm_lstm = tf.contrib.rnn.BasicLSTMCell(self.kwm_lstm_size)
-        kwm_init_state = kwm_lstm.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        kwm_rnn_outputs, kwm_final_state = tf.nn.dynamic_rnn(cell=kwm_lstm,
-                                                     inputs=self.e,
-                                                     initial_state=kwm_init_state,
-                                                     sequence_length=self.seq_len,
-                                                     scope="kwm")
+        kwm_rnn_outputs, kwm_final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         kwm_last_output, self.kwm_alphas = attention_layer(self.attention_size, kwm_rnn_outputs, "kwm_encoder", sparse=self.sparse)
 
@@ -485,20 +406,4 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
 
-def get_model(args, all_models, vocab_size):
-    init = all_models[args.modeltype]
-    model = init(batch_size=args.batch_size,
-                 lstm_size=args.lstm_size,
-                 max_len=args.max_len,
-                 keep_probs=args.keep_probs,
-                 embeddings_dim=args.embedding_dim,
-                 vocab_size=vocab_size,
-                 reg=args.reg_method,
-                 lam=args.lam,
-                 sparse=args.reg_method == "sparse",
-                 learning_rate=args.learning_rate)
-    return model
 
-
-def get_additive_model(pred_model, keyword_model):
-    return AdditiveModel(pred_model, keyword_model)

@@ -44,8 +44,11 @@ def html_render(x_orig, alphas, effect_list, inv_dict, max_len=30):
 
 
         #Show word effect, hover to see word
-        orig_html.append(format("<b style='color:rgb(%d,%d,%d)' title='%s'>%s</b>" %(colors[0], colors[1], colors[2], str(effect_list[x_orig[i]]), inv_dict[x_orig[i]])))
-    
+        if effect_list:
+            orig_html.append(format("<b style='color:rgb(%d,%d,%d)' title='%s'>%s</b>" %(colors[0], colors[1], colors[2], str(effect_list[x_orig[i]]), inv_dict[x_orig[i]])))
+        else:
+            orig_html.append(format("<b style='color:rgb(%d,%d,%d)'>%s</b>" %(colors[0], colors[1], colors[2], inv_dict[x_orig[i]])))
+
     orig_html = ' '.join(orig_html)
     return orig_html
 
@@ -55,7 +58,6 @@ def knit(xs, ys, word_dict, effect_list, model, sess, show=100):
     inv_dict = {}
     for k in word_dict.keys():
         inv_dict[word_dict[k]] = k
-
 
     predictions = []
     alphass = []
@@ -87,9 +89,10 @@ def knit(xs, ys, word_dict, effect_list, model, sess, show=100):
         line += "</p>"
         line += "attention weights:"
         line += str(alphas)
-        line += "<p>effect list:"
-        line += str([effect_list[w] for w in x])
-        line += "</p>"
+        if effect_list:
+            line += "<p>effect list:"
+            line += str([effect_list[w] for w in x])
+            line += "</p>"
         line += "<p>"
         line += "###############################"
         line += "</p>"

@@ -31,3 +31,9 @@ python main.py baseline_lstm additive_lstm_sparse_attention \
         --kwm_path ./models/keyword_model_sparse_attention \
         --epoch 20 \
         --learning_rate 1.0
+
+# Training a baseline lstm + attention model
+python main.py baseline_lstm baseline_lstm_attention \
+        --epoch 20 \
+        --learning_rate 1.0
+

@@ -1,47 +1,19 @@
 import pickle
-import tensorflow as tf
-import models
 import os
-import vis_util
-import argparse
 import sys
 import time
-from load_data import load_all_data, load_file
 import utils
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-
-all_models = {
-    'reg_attention': models.RegAttention,
-    'adv_mlp': models.LSTMPredModelWithMLPKeyWordModelAdvTrain,
-    'hex_attention': models.LSTMPredModelWithRegAttentionKeyWordModelHEX,
-    'baseline_lstm': models.LSTMPredModel,
-    'baseline_mlp': models.MLPPredModel
-}
-model_types = all_models.keys()
-
-reg_methods = ['none', 'weight', 'entropy', 'sparse']
-
-parser = argparse.ArgumentParser()
-parser.add_argument("modeltype", help="the type of models to choose from, choose from " + str(model_types))
-parser.add_argument("modelname", help="specify the name of the model", type=str)
-
-parser.add_argument("--test", action="store_true", default=False, help="Only test and produce visualisation")
-parser.add_argument("--debug", action="store_true", default=False, help="Use debug dataset for quick debug runs")
-parser.add_argument("--lam", type=float, default=0.01, help="Coefficient of regularization term")
-parser.add_argument("--reg_method", type=str, default="none", help="Specify regularization method for key-model weights. Default is 'none'. Choose from " + str(reg_methods))
-parser.add_argument("--epochs", type=int, default=21, help="Specify epochs to train")
-parser.add_argument("--kwm_path", type=str, default="", help="Specify a path to the pre-trained keyword model. Will only train a key-word model if left empty." )
-parser.add_argument("--max_len", type=int, default=30, help="Maximum sentence length (excessive words are dropped)")
-parser.add_argument("--lstm_size", type=int, default=20, help="Size of lstm unit in current model.")
-parser.add_argument("--embedding_dim", type=int, default=20, help="Dimension of embedding to use.")
-parser.add_argument("--data_path", type=str, default="./data", help="Specify data directory (where inputs, effect list, vocabulary, etc. are )")
-parser.add_argument("--batch_size", type=int, default=10)
-parser.add_argument("--keep_probs", type=float, default=0.8, help="Keep probability of dropout layers. Set it to 1.0 to disable dropout.")
-parser.add_argument("--learning_rate", type=float, default=0.1)
-
-args = parser.parse_args()
-if args.modeltype not in model_types:
-    raise NotImplementedError("Model type invalid")
+args = utils.get_args()
+if args.task == "synthetic":
+    import runner_synthetic as runner
+elif args.task == "snli":
+    args.embedding_dim = 300
+    import runner_nli as runner
+elif args.task == "mnli":
+    raise NotImplementedError
 
 # Defining directories
 ckpt_dir = os.path.join("models", args.modelname)
@@ -79,81 +51,7 @@ print(args.__dict__)
 
 #Loading data:
 
-train_x, train_y, test_x, test_y, word_dict, effect_list, embedding_matrix = load_all_data(args)
-vocab_size = embedding_matrix.shape[0]
-
-print("Dataset building all done")
-
-sess = tf.Session()
-use_additive = False
-if args.kwm_path != "":
-
-    prev_arg_file = os.path.join(args.kwm_path, "args.pkl")
-    prev_args = load_file(prev_arg_file)
-
-    print("Loading key-word model with the following parameters: ")
-    print(prev_args.__dict__)
-
-    with tf.variable_scope(prev_args.modelname) as scope:
-        key_word_model = models.get_model(prev_args, all_models, vocab_size)
-    kwm_saver = tf.train.Saver()
-
-    kwm_ckpt = os.path.join(args.kwm_path, prev_args.modelname)
-    kwm_saver.restore(sess, kwm_ckpt)
-    use_additive = True
-
-
-with tf.variable_scope(args.modelname) as scope:
-    pred_model = models.get_model(args, all_models, vocab_size)
-
-saver = tf.train.Saver()
-
-if use_additive:
-    model = models.get_additive_model(pred_model, key_word_model)
-else:
-    model = pred_model
-
-utils.initialize_uninitialized_global_variables(sess)
-
-print("Buidling the model. Model name: {}".format(args.modelname))
-
-
-if args.test:
-    saver.restore(sess, ckpt_file)
-    print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
-    print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
-
-else:
-    sess.run(tf.assign(pred_model.embedding_w, embedding_matrix))
-
-    if os.path.exists(ckpt_file+".meta"):
-        print('Restoring Model')
-        saver.restore(sess, ckpt_file)
-
-    print('Training..')
-    for i in range(num_epochs):
-        epoch_loss, epoch_accuracy = model.train_for_epoch(sess, train_x, train_y)
-        print(i,'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
-        #print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
-        print(sess.run(tf.all_variables()[0][0]))
-        print('Test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
-        if model.use_alphas:
-            print('Signal capturing score= ', model.evaluate_capturing(sess, test_x, test_y, effect_list))
-    if not os.path.exists(ckpt_dir):
-        os.mkdir(ckpt_dir)
-
-    print("Saving the model")
-    saver.save(sess, ckpt_file)
-    print("Finished")
-
-
-if model.use_alphas:
-    print("Producing visualization")
-    htmls = vis_util.knit(test_x, test_y, word_dict, effect_list, model, sess, 100)
-    f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
-    for i in htmls:
-        f.write(i)
-    f.close()
-
+################################Start runner here ############################
+runner.run(args, ckpt_dir, ckpt_file)
 
 

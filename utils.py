@@ -1,6 +1,7 @@
 import sys
 import tensorflow as tf
-
+import argparse
+import models
 
 class Logger(object):
     def __init__(self, log_file):
@@ -38,4 +39,48 @@ def initialize_uninitialized_global_variables(sess):
         sess.run(tf.variables_initializer(not_initialized_vars))
     return
 
+
+all_models = {
+    'reg_attention': models.RegAttention,
+    'adv_mlp': models.LSTMPredModelWithMLPKeyWordModelAdvTrain,
+    'hex_attention': models.LSTMPredModelWithRegAttentionKeyWordModelHEX,
+    'baseline_lstm': models.LSTMPredModel,
+    'baseline_mlp': models.MLPPredModel
+}
+model_types = all_models.keys()
+reg_methods = ['none', 'weight', 'entropy', 'sparse']
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("modeltype", help="the type of models to choose from, choose from " + str(model_types))
+    parser.add_argument("modelname", help="specify the name of the model", type=str)
+
+    parser.add_argument("--test", action="store_true", default=False, help="Only test and produce visualisation")
+    parser.add_argument("--task", type=str, default="synthetic", help="Choose from ['synthetic', 'snli', 'mnli'] ")
+    parser.add_argument("--debug", action="store_true", default=False, help="Use debug dataset for quick debug runs")
+    parser.add_argument("--lam", type=float, default=0.01, help="Coefficient of regularization term")
+    parser.add_argument("--reg_method", type=str, default="none",
+                        help="Specify regularization method for key-model weights. Default is 'none'. Choose from " + str(
+                            reg_methods))
+    parser.add_argument("--epochs", type=int, default=21, help="Specify epochs to train")
+    parser.add_argument("--kwm_path", type=str, default="",
+                        help="Specify a path to the pre-trained keyword model. Will only train a key-word model if left empty.")
+    parser.add_argument("--max_len", type=int, default=30, help="Maximum sentence length (excessive words are dropped)")
+    parser.add_argument("--lstm_size", type=int, default=20, help="Size of lstm unit in current model.")
+    parser.add_argument("--embedding_dim", type=int, default=20, help="Dimension of embedding to use.")
+    parser.add_argument("--data_path", type=str, default="./data",
+                        help="Specify data directory (where inputs, effect list, vocabulary, etc. are )")
+    parser.add_argument("--batch_size", type=int, default=10)
+    parser.add_argument("--keep_probs", type=float, default=0.8,
+                        help="Keep probability of dropout layers. Set it to 1.0 to disable dropout.")
+    parser.add_argument("--learning_rate", type=float, default=0.1)
+    parser.add_argument("--embedding_file", type=str, default="",
+                        help="Specify path to the pre-trained embedding file, if had one.")
+
+    args = parser.parse_args()
+    if args.modeltype not in model_types:
+        raise NotImplementedError("Model type invalid")
+    return args
 
