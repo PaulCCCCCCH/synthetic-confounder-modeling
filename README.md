@@ -9,7 +9,7 @@
 run `runner_synthetic.sh` or run `generate.py` and then `main.py`.
 See parameters using `python generate.py -h` and `python main.py -h`
 
-## Runing models on nli dataset:
+## Running models on MNLI dataset:
 run `runner_nli.sh`
 **Important**: Please make sure that all json files (both snli and mnli) are in one directory. Use version 1.0 for snli
 and 0.9 for mnli. Embedding file must be specified for nli tasks.
