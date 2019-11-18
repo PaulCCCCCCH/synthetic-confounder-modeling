@@ -29,7 +29,19 @@ run `runner_synthetic.sh` or run `generate.py` and then `main.py`.
 See parameters using `python generate.py -h` and `python main.py -h`
 
 ## Running models on MNLI dataset:
-run `runner_nli.sh`
+run `runner_nli.sh`. Supported models:
+```
+all_models = {
+    'reg_attention':    'models.RegAttention',
+    'adv_mlp':          'models.LSTMPredModelWithMLPKeyWordModelAdvTrain',
+    'hex_attention':    'models.LSTMPredModelWithRegAttentionKeyWordModelHEX',
+    'baseline_lstm':    'models.LSTMPredModel',
+    'baseline_mlp':     'models.MLPPredModel',
+    'baseline_bilstm':  'models.BiLSTMPredModel',           # NLI task only
+    'bilstm_attention': 'models.BiLSTMAttentionPredModel',  # NLI task only
+    'baseline_esim':    'models.ESIMPredModel'              # NLI task only
+}
+```
 
 Training logs and visualisations can be found in `./models/${modelname}/vis.html`
 
