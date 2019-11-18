@@ -39,3 +39,14 @@ python main.py baseline_lstm debug_additive_lstm_sparse_attention \
         --debug \
         --learning_rate 1.0
 
+python main.py adv_mlp debug_attention_adv_mlp \
+        --epoch 5 \
+        --debug \
+        --learning_rate 0.1
+
+python main.py hex_attention debug_attention_hex \
+        --epoch 5 \
+        --debug \
+        --learning_rate 0.1
+
+

@@ -40,18 +40,10 @@ def initialize_uninitialized_global_variables(sess):
     return
 
 
-all_models = {
-    'reg_attention': models.RegAttention,
-    'adv_mlp': models.LSTMPredModelWithMLPKeyWordModelAdvTrain,
-    'hex_attention': models.LSTMPredModelWithRegAttentionKeyWordModelHEX,
-    'baseline_lstm': models.LSTMPredModel,
-    'baseline_mlp': models.MLPPredModel
-}
-model_types = all_models.keys()
-reg_methods = ['none', 'weight', 'entropy', 'sparse']
-
-
 def get_args():
+    reg_methods = ['none', 'weight', 'entropy', 'sparse']
+    from model_utils import all_models
+    model_types = all_models.keys()
     parser = argparse.ArgumentParser()
 
     parser.add_argument("modeltype", help="the type of models to choose from, choose from " + str(model_types))
@@ -69,6 +61,7 @@ def get_args():
                         help="Specify a path to the pre-trained keyword model. Will only train a key-word model if left empty.")
     parser.add_argument("--max_len", type=int, default=30, help="Maximum sentence length (excessive words are dropped)")
     parser.add_argument("--lstm_size", type=int, default=20, help="Size of lstm unit in current model.")
+    parser.add_argument("--attention_size", type=int, default=16, help="Size of attention layer (if had one)")
     parser.add_argument("--embedding_dim", type=int, default=20, help="Dimension of embedding to use.")
     parser.add_argument("--data_path", type=str, default="./data",
                         help="Specify data directory (where inputs, effect list, vocabulary, etc. are )")
@@ -78,6 +71,7 @@ def get_args():
     parser.add_argument("--learning_rate", type=float, default=0.1)
     parser.add_argument("--embedding_file", type=str, default="",
                         help="Specify path to the pre-trained embedding file, if had one.")
+    parser.add_argument("--kwm_lstm_size", type=int, default=16, help="Only used in adversarial training models.")
 
     args = parser.parse_args()
     if args.modeltype not in model_types:

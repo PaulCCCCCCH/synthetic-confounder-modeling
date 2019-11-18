@@ -3,14 +3,23 @@ import tensorflow as tf
 # Input must be of shape (Batch, TimeStep, HiddenSize)
 
 all_models = {
-    'reg_attention': 'models.RegAttention',
-    'adv_mlp': 'models.LSTMPredModelWithMLPKeyWordModelAdvTrain',
-    'hex_attention': 'models.LSTMPredModelWithRegAttentionKeyWordModelHEX',
-    'baseline_lstm': 'models.LSTMPredModel',
-    'baseline_mlp': 'models.MLPPredModel'
+    'reg_attention':    'models.RegAttention',
+    'adv_mlp':          'models.LSTMPredModelWithMLPKeyWordModelAdvTrain',
+    'hex_attention':    'models.LSTMPredModelWithRegAttentionKeyWordModelHEX',
+    'baseline_lstm':    'models.LSTMPredModel',
+    'baseline_mlp':     'models.MLPPredModel',
+    'baseline_bilstm':  'models.BiLSTMPredModel',           # NLI task only
+    'bilstm_attention': 'models.BiLSTMAttentionPredModel',  # NLI task only
+    'baseline_esim':    'models.ESIMPredModel'              # NLI task only
 }
 
+
 def attention_layer(attention_size, inputs, name, sparse=False):
+
+    if isinstance(inputs, tuple):
+        # In case of Bi-RNN, concatenate the forward and the backward RNN outputs.
+        inputs = tf.concat(inputs, 2)
+
     w_omega = tf.get_variable('w_omega_'+name, initializer=tf.random_normal([int(inputs.shape[-1]), attention_size]))
     b_omega = tf.get_variable('b_omega_'+name, initializer=tf.random_normal([attention_size]))
     u_omega = tf.get_variable('u_omega_'+name, initializer=tf.random_normal([attention_size]))
@@ -73,18 +82,10 @@ def get_reg(alphas, lam=0, type=""):
 
     return reg
 
+
 def get_model(args, init, vocab_size):
 
-    model = init(batch_size=args.batch_size,
-                 lstm_size=args.lstm_size,
-                 max_len=args.max_len,
-                 keep_probs=args.keep_probs,
-                 embeddings_dim=args.embedding_dim,
-                 vocab_size=vocab_size,
-                 reg=args.reg_method,
-                 lam=args.lam,
-                 sparse=args.reg_method == "sparse",
-                 learning_rate=args.learning_rate)
+    model = init(args, vocab_size)
     return model
 
 

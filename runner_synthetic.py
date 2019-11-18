@@ -43,7 +43,8 @@ def run(args, ckpt_dir, ckpt_file):
     saver = tf.train.Saver()
 
     if use_additive:
-        model = model_utils.get_additive_model(pred_model, key_word_model)
+        prev_init = models.AdditiveModel
+        model = model_utils.get_additive_model(prev_init, pred_model, key_word_model)
     else:
         model = pred_model
 

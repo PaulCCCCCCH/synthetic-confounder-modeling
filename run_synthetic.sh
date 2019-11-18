@@ -37,3 +37,4 @@ python main.py baseline_lstm baseline_lstm_attention \
         --epoch 20 \
         --learning_rate 1.0
 
+

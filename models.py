@@ -79,18 +79,27 @@ class AdditiveModel(object):
 
 
 class Model(object):
-    def __init__(self, batch_size=10, max_len=30, vocab_size=10000, embeddings_dim=20,
-                 use_embedding=True, reg=None, learning_rate=0.1):
-        self.batch_size = batch_size
-        self.max_len = max_len
-        self.emb_dim = embeddings_dim
+    def __init__(self, args, vocab_size):
+        self.batch_size = args.batch_size
+        self.max_len = args.max_len
+        self.reg = args.reg_method
+        self.learning_rate = args.learning_rate
+        self.emb_dim = args.embedding_dim
+        self.lstm_size = args.lstm_size
+        self.attention_size = args.attention_size
+        self.lam = args.lam
+        self.keep_probs = args.keep_probs
+        self.kwm_lstm_size = args.kwm_lstm_size
+
         self.vocab_size = vocab_size
-        self.use_embedding = use_embedding
-        self.reg = reg
+
+        self.epsilon = 1e-10
+        self.sparse = args.reg_method == "sparse"
         self.use_alphas = False
-        self.learning_rate = learning_rate
+
         self.build_inputs()
         self.build_embedding()
+        self.build_model()
 
     def build_model(self):
         raise NotImplementedError
@@ -152,30 +161,14 @@ class Model(object):
         self.seq_len = tf.cast(tf.reduce_sum(tf.sign(self.x_holder), axis=1), tf.int32)
 
     def build_embedding(self):
-        if self.use_embedding:
-            self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer())
-        else:
-            self.embedding_w = tf.one_hot(list(range(self.vocab_size)), depth=self.vocab_size)
-
+        self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer())
         self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
 
 
 class RegAttention(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9, attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, learning_rate=0.1):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
-        self.lstm_size = lstm_size
-        self.attention_size = attention_size
-        self.reg = reg
-        self.lam = lam
-        self.epsilon = 1e-10
-        self.sparse = sparse
-        self.keep_probs = keep_probs
-        self.use_alphas = True
-        self.build_model()
 
     def build_model(self):
-        # shape = (batch_size, sentence_length, emb_dim)
-
+        self.use_alphas = True
 
         rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
@@ -200,22 +193,10 @@ class RegAttention(Model):
 
 
 class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
-        self.lstm_size = lstm_size
-        self.attention_size = attention_size
-        self.reg = reg
-        self.lam = lam
-        self.kwm_lstm_size = kwm_lstm_size
-        self.sparse = sparse
-        self.keep_probs = keep_probs
-        self.use_alphas = True
-        self.build_model()
-
 
     def build_model(self):
 
+        self.use_alphas = True
         rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "pred_encoder", sparse=self.sparse)
@@ -225,7 +206,7 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
         self.logits = dense_layer(last_output, 2, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
-        ### Debug ###
+        ### Not using dense_layer for debugging reasons ###
         adv_in = tf.reshape(self.e, [-1, self.e.shape[1] * self.e.shape[2]])
         self.w_adv = tf.get_variable("w", shape=[adv_in.shape[-1], 2],
                             initializer=tf.truncated_normal_initializer())
@@ -250,21 +231,9 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(Model):
 
 
 class LSTMPredModel(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
-        self.lstm_size = lstm_size
-        self.attention_size = attention_size
-        self.reg = reg
-        self.lam = lam
-        self.kwm_lstm_size = kwm_lstm_size
-        self.sparse = sparse
-        self.keep_probs = keep_probs
-        self.use_alphas = True
-        self.build_model()
-
 
     def build_model(self):
+        self.use_alphas = True
 
         rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
 
@@ -285,19 +254,6 @@ class LSTMPredModel(Model):
 
 
 class MLPPredModel(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=20, learning_rate=0.1):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
-        self.lstm_size = lstm_size
-        self.attention_size = attention_size
-        self.reg = reg
-        self.lam = lam
-        self.kwm_lstm_size = kwm_lstm_size
-        self.sparse = sparse
-        self.keep_probs = keep_probs
-        self.use_alphas = False
-        self.build_model()
-
 
     def build_model(self):
         inputs = tf.reshape(self.e, [-1, self.e.shape[1] * self.e.shape[2]])
@@ -318,29 +274,18 @@ class MLPPredModel(Model):
 
 
 class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
-    def __init__(self, batch_size=10, max_len=30, lstm_size=20, vocab_size=10000, embeddings_dim=20, keep_probs=0.9,
-                 attention_size=16, use_embedding=True, reg="none", lam=None, sparse=False, kwm_lstm_size=10, learning_rate=0.1):
-        Model.__init__(self, batch_size, max_len, vocab_size, embeddings_dim, use_embedding, learning_rate=learning_rate)
-        self.lstm_size = lstm_size
-        self.attention_size = attention_size
-        self.reg = reg
-        self.lam = lam
-        self.kwm_lstm_size = kwm_lstm_size
-        self.sparse = sparse
-        self.keep_probs = keep_probs
-        self.use_alphas = True
-        self.build_model()
 
     def build_model(self):
+        self.use_alphas = True
 
         # Define prediction rnn
-        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
+        rnn_outputs, final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len, scope="pred_lstm")
 
         last_output, self.alphas = attention_layer(self.attention_size, rnn_outputs, "pred_encoder")
         #last_output = tf.nn.dropout(last_output, self.keep_probs)
 
         # Define key-word model rnn
-        kwm_rnn_outputs, kwm_final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len)
+        kwm_rnn_outputs, kwm_final_state = lstm_layer(self.e, self.lstm_size, self.batch_size, self.seq_len, scope="kwm_lstm")
 
         kwm_last_output, self.kwm_alphas = attention_layer(self.attention_size, kwm_rnn_outputs, "kwm_encoder", sparse=self.sparse)
 
@@ -349,14 +294,6 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(Model):
 
         h_fc1 = last_output
         h_fc2 = kwm_last_output
-
-        # Hex layer definition
-        """
-        self.W_cl_1 = tf.Variable(tf.random_normal([self.dim, 3], stddev=0.1))
-        self.W_cl_2 = tf.Variable(tf.random_normal([1200, 3]), trainable=True)
-        self.b_cl = tf.Variable(tf.random_normal((3,)), trainable=True)
-        self.W_cl = tf.concat([self.W_cl_1, self.W_cl_2], 0)
-        """
 
         # Compute prediction using [h_fc1, 0(pad)]
         pad = tf.zeros_like(h_fc2, tf.float32)

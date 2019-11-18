@@ -74,6 +74,7 @@ def run(args, ckpt_dir, ckpt_file):
             print('Dev accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
             print('Dev matched accuracy = ', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
             print('Dev mismatched accuracy = ', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
+            saver.save(sess, ckpt_file)
 
         if not os.path.exists(ckpt_dir):
             os.mkdir(ckpt_dir)
