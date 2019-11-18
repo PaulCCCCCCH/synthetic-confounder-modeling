@@ -1,5 +1,4 @@
 import tensorflow as tf
-import models
 
 # Input must be of shape (Batch, TimeStep, HiddenSize)
 
@@ -89,5 +88,5 @@ def get_model(args, init, vocab_size):
     return model
 
 
-def get_additive_model(pred_model, keyword_model):
-    return models.AdditiveModel(pred_model, keyword_model)
+def get_additive_model(init, pred_model, keyword_model):
+    return init(pred_model, keyword_model)

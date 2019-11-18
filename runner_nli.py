@@ -45,7 +45,8 @@ def run(args, ckpt_dir, ckpt_file):
     saver = tf.train.Saver()
 
     if use_additive:
-        model = model_utils.get_additive_model(pred_model, key_word_model)
+        init = models.AdditiveModel
+        model = model_utils.get_additive_model(init, pred_model, key_word_model)
     else:
         model = pred_model
 
@@ -69,7 +70,7 @@ def run(args, ckpt_dir, ckpt_file):
             epoch_loss, epoch_accuracy = model.train_for_epoch(sess, train_x, train_y)
             print(i, 'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
             # print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
-            print(sess.run(tf.all_variables()[0][0]))
+            # print(sess.run(tf.all_variables()[0][0]))
             print('Dev accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
             print('Dev matched accuracy = ', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
             print('Dev mismatched accuracy = ', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
@@ -81,13 +82,12 @@ def run(args, ckpt_dir, ckpt_file):
         saver.save(sess, ckpt_file)
         print("Finished")
 
-    # TODO: Produce visualisation
-    # if model.use_alphas:
-    #     print("Producing visualization")
-    #     htmls = vis_utils.knit(test_x, test_y, word_dict, None, model, sess, 100)
-    #     f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
-    #     for i in htmls:
-    #         f.write(i)
-    #     f.close()
+    if model.use_alphas:
+        print("Producing visualization")
+        htmls = vis_utils.knit_nli(test_x, test_y, word_dict, None, model, sess, 100)
+        f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
+        for i in htmls:
+            f.write(i)
+        f.close()
 
 

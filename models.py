@@ -77,6 +77,7 @@ class AdditiveModel(object):
             score += factor
         return score / test_batches
 
+
 class Model(object):
     def __init__(self, batch_size=10, max_len=30, vocab_size=10000, embeddings_dim=20,
                  use_embedding=True, reg=None, learning_rate=0.1):

@@ -86,7 +86,5 @@ parser.add_argument("--learning_rate", type=float, default=0.1)
 ```
 
 ## TODO:
-- Loading mnli dataset repetitive work
-- Visualization for snli
 
 

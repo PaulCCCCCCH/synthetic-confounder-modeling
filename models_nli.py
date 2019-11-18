@@ -1,7 +1,73 @@
 import tensorflow as tf
 import numpy as np
 from model_utils import dense_layer, attention_layer, get_reg, lstm_layer
-from models import Model, AdditiveModel
+from models import Model
+
+
+class AdditiveModel(object):
+    def __init__(self, pred_model, keyword_model):
+        self.pred_model = pred_model
+        self.keyword_model = keyword_model
+        assert self.pred_model.batch_size == self.keyword_model.batch_size
+        self.batch_size = self.pred_model.batch_size
+        self.use_alphas = False
+        if self.pred_model.use_alphas:
+            self.use_alphas = True
+            self.alphas_hypo = self.pred_model.alphas_hypo
+            self.alphas_prem = self.pred_model.alphas_prem
+        self.build_model()
+
+    def build_model(self):
+        self.logits = self.pred_model.logits + tf.stop_gradient(self.keyword_model.logits)
+        self.y = tf.nn.softmax(self.logits)
+        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.one_hot(self.pred_model.y_holder, depth=3), logits=self.logits))
+
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.pred_model.y_holder, tf.argmax(self.pred_model.y, 1)), tf.float32))
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.pred_model.learning_rate)
+        self.train_op = self.optimizer.minimize(self.cost)
+
+
+    def train_for_epoch(self, sess, train_x, train_y):
+        # cur_state = sess.run(init_state)
+        batches_per_epoch = train_x.shape[0] // self.batch_size
+        epoch_loss = 0.0
+        epoch_accuracy = 0.0
+        for idx in range(batches_per_epoch):
+            batch_idx = np.random.choice(train_x.shape[0], size=self.batch_size, replace=False)
+            batch_xs = train_x[batch_idx, :]
+            batch_ys = train_y[batch_idx]
+            batch_loss, _, batch_accuracy = sess.run([self.cost, self.train_op, self.accuracy],
+                                                     feed_dict={self.pred_model.x_holder: batch_xs,
+                                                                self.pred_model.y_holder: batch_ys,
+                                                                self.keyword_model.x_holder: batch_xs,
+                                                                self.keyword_model.y_holder: batch_ys})
+            epoch_loss += batch_loss
+            epoch_accuracy += batch_accuracy
+        return epoch_loss / batches_per_epoch, epoch_accuracy / batches_per_epoch
+
+    def predict_no_alphas(self, sess, test_x):
+        pred_y = sess.run(self.pred_model.y, feed_dict={self.pred_model.x_holder: test_x})
+        return pred_y
+
+    def predict(self, sess, test_x):
+        pred_y, alphas_hypo, alphas_prem = sess.run([self.pred_model.y, self.pred_model.alphas_hypo, self.pred_model.alphas_prem], feed_dict={self.pred_model.x_holder: test_x})
+        return pred_y, alphas_hypo, alphas_prem
+
+    def evaluate_accuracy(self, sess, test_x, test_y):
+        test_accuracy = 0.0
+        test_batches = test_x.shape[0] // self.batch_size
+        for i in range(test_batches):
+            test_idx = range(i * self.batch_size, (i + 1) * self.batch_size)
+            test_xs = test_x[test_idx, :]
+            test_ys = test_y[test_idx]
+            pred_ys = self.predict_no_alphas(sess, test_xs)
+            test_accuracy += np.sum(np.argmax(pred_ys, axis=1) == test_ys)
+        test_accuracy /= (test_batches * self.batch_size)
+        return test_accuracy
+
+    def evaluate_capturing(self, sess, test_x, test_y, effect_dict):
+        raise NotImplementedError
 
 
 class NLIModel(Model):
@@ -85,13 +151,13 @@ class RegAttention(NLIModel):
 
         self.alphas_hypo = alphas_hypo
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 2, activation=None, name="pred_out")
+        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
         # WARNING: This op expects unscaled logits, since it performs a softmax on logits internally for efficiency.
         # Do not call this op with the output of softmax, as it will produce incorrect results.
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
 
         reg1 = get_reg(alphas_hypo, lam=self.lam, type=self.reg)
         reg2 = get_reg(alphas_prem, lam=self.lam, type=self.reg)
@@ -127,7 +193,7 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(NLIModel):
         last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
         self.alphas_hypo = alphas_hypo
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 2, activation=None, name="pred_out")
+        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
 
@@ -142,12 +208,12 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(NLIModel):
         adv_logits = tf.matmul(adv_in, self.w_adv) + self.b_adv
         ############
         """
-        adv_logits = dense_layer(tf.concat([adv_in_hypo, adv_in_prem], axis=1), 2, activation=None, name="adv_encoder")
+        adv_logits = dense_layer(tf.concat([adv_in_hypo, adv_in_prem], axis=1), 3, activation=None, name="adv_encoder")
         adv_cost = 1 / tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=adv_logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=adv_logits))
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
         self.cost = self.cost + 0.01 * adv_cost
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
@@ -180,11 +246,11 @@ class LSTMPredModel(NLIModel):
         last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
         self.alphas_hypo = alphas_hypo
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 2, activation=None, name="pred_out")
+        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
         self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
@@ -211,10 +277,10 @@ class MLPPredModel(NLIModel):
         inputs_hypo = tf.reshape(self.e_hypo, [-1, self.e_hypo.shape[1] * self.e_hypo.shape[2]])
         inputs_prem = tf.reshape(self.e_prem, [-1, self.e_prem.shape[1] * self.e_prem.shape[2]])
 
-        self.logits = dense_layer(tf.concat([inputs_hypo, inputs_prem], axis=1), 2, activation=None, name="pred_out")
+        self.logits = dense_layer(tf.concat([inputs_hypo, inputs_prem], axis=1), 3, activation=None, name="pred_out")
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
 
         self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.cost)
@@ -281,7 +347,7 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
         yconv_contact_pred = tf.nn.dropout(tf.concat([h_fc1, pad], 1), self.keep_probs)
 
         # y_conv_pred = tf.matmul(yconv_contact_pred, self.W_cl) + self.b_cl
-        y_conv_pred = dense_layer(yconv_contact_pred, 2, name="conv_pred")
+        y_conv_pred = dense_layer(yconv_contact_pred, 3, name="conv_pred")
 
         self.logits = y_conv_pred  # Prediction
 
@@ -291,12 +357,12 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
         yconv_contact_H = tf.concat([pad2, h_fc2], 1)
         # Get Fg
         # y_conv_H = tf.matmul(yconv_contact_H, self.W_cl) + self.b_cl  # get Fg
-        y_conv_H = dense_layer(yconv_contact_H, 2, name="conv_H")
+        y_conv_H = dense_layer(yconv_contact_H, 3, name="conv_H")
 
         yconv_contact_loss = tf.nn.dropout(tf.concat([h_fc1, h_fc2], 1), self.keep_probs)
         # Get Fb
         # y_conv_loss = tf.matmul(yconv_contact_loss, self.W_cl) + self.b_cl  # get Fb
-        y_conv_loss = dense_layer(yconv_contact_loss, 2, name="conv_loss")
+        y_conv_loss = dense_layer(yconv_contact_loss, 3, name="conv_loss")
 
         temp = tf.matmul(y_conv_H, y_conv_H, transpose_a=True)
         self.temp = temp
@@ -309,7 +375,7 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
         self.y = tf.nn.softmax(self.logits)
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=2), logits=self.logits))
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
 
         # Regularize kwm attention
         reg1 = get_reg(kwm_alphas_hypo, lam=self.lam, type=self.reg)
