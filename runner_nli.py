@@ -30,7 +30,7 @@ def run(args, ckpt_dir, ckpt_file):
         print(prev_args.__dict__)
 
         with tf.variable_scope(prev_args.modelname) as scope:
-            prev_init = eval(model_utils.all_models[args.modeltype])
+            prev_init = eval(model_utils.all_models[prev_args.modeltype])
             key_word_model = model_utils.get_model(prev_args, prev_init, vocab_size)
         kwm_saver = tf.train.Saver()
 
