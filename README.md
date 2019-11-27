@@ -24,11 +24,12 @@ To train separate models, use different names.
 **Very important arguments**
 - `--task`: Choose from ['snli' and 'mnli'] for nli tasks. They differ only on the training set they use.
 Choose 'synthetic' for biased-signal capturing task.
-- `--reg_method`: If an attention layer is involved in a model, then it can be regularized by specifying one of
+- `--reg_method`: If an attention layer is involved in a model, it can be regularized by specifying one of
 ['none', 'weight', 'entropy', 'sparse'].
-- `--kwm_path`: If wish to train an additive model with pre-trained keyword model, then specify the path to the
+- `--kwm_path`: If wish to train an additive model with pre-trained keyword model, specify the path to the
 keyword model you wish to use. Its weights will be frozen an parameters will be restored automatically. So, the
-argument you input will only apply to the additive model. Doing this will not effect the keyword model.
+argument you input will only apply to the additive model. Doing this will not change the saved keyword model.
+Leave it empty if not using additive training.
 - `--data_path`: A repository containing 6 json files (both snli and mnli). File names must be the following:
 ```
     snli_1.0_train.jsonl,
@@ -65,7 +66,8 @@ For other defined variables, see `class Model` definition in `models.py` and `cl
 - self.train_op: e.g. `self.optimizer.minimize(self.cost)`
 - self.accuracy: e.g. `tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))`
 
-and, if you would like to have a visualisation of an attention layer, you need to set the following variables
+and, if you would like to have a visualisation of an attention layer or other weights, you need to set the following
+variables
 - self.use_alphas: set it to True
 - self.alphas_hypo: the alpha values produced by `attention_layer` function, or something equivalent
 with shape (batch_size, max_len)
@@ -73,7 +75,7 @@ with shape (batch_size, max_len)
 
 3. Go to `model_utils.py` and add `<modelname> : <classname>` pair to "all_models" dictionary.
 
-4. It's done. You can call it by passing the modelname to `main.py`.
+4. It's done. You can call it by passing the `--modelname` to `main.py`.
 
 
 ## Running models on synthetic dataset
