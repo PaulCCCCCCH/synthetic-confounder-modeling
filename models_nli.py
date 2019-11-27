@@ -119,7 +119,7 @@ class NLIModel(Model):
 
     def build_embedding(self):
         self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size, self.emb_dim],
-                                               initializer=tf.random_uniform_initializer())
+                                               initializer=tf.random_uniform_initializer(), trainable=False)
 
         self.e_hypo = tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 0, :])
         self.e_prem = tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 1, :])
@@ -323,7 +323,7 @@ class BiLSTMPredModel(NLIModel):
 
         ## Define parameters
 
-        self.W_mlp = tf.Variable(tf.random_normal([self.emb_dim * 4, self.emb_dim], stddev=0.1))
+        self.W_mlp = tf.Variable(tf.random_normal([self.emb_dim * 8, self.emb_dim], stddev=0.1))
         self.b_mlp = tf.Variable(tf.random_normal([self.emb_dim], stddev=0.1))
 
         self.W_cl = tf.Variable(tf.random_normal([self.emb_dim, 3], stddev=0.1))

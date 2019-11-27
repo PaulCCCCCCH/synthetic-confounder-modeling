@@ -1,19 +1,22 @@
 import tensorflow as tf
-import os
 import vis_utils
-from data_utils import load_all_data_snli, load_all_data_mnli, load_file
+from data_utils import *
 import utils
 import models_nli as models   # This is necessary!
 import model_utils
 
 
 def run(args, ckpt_dir, ckpt_file):
-    assert args.task == "snli"
 
-    # Defining directories
-
-    train_x, train_y, dev_x, dev_y, test_x, test_y, word_dict, embedding_matrix = load_all_data_snli(args)
-    dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y = load_all_data_mnli(args, word_dict)
+    # Loading data
+    if args.task == "snli":
+        train_x, train_y, dev_x, dev_y, test_x, test_y, word_dict, embedding_matrix = load_all_data_snli(args)
+        dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y = load_test_data_mnli(args, word_dict)
+    elif args.task == "mnli":
+        train_x, train_y, dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y, word_dict, embedding_matrix = load_all_data_mnli(args)
+        dev_x, dev_y, test_x, test_y = load_test_data_snli(args, word_dict)
+    else:
+        raise NotImplementedError
 
     vocab_size = embedding_matrix.shape[0]
 
@@ -56,7 +59,9 @@ def run(args, ckpt_dir, ckpt_file):
 
     if args.test:
         saver.restore(sess, ckpt_file)
-        print('Test accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
+        print('SNLI test accuracy = ', model.evaluate_accuracy(sess, test_x, test_y))
+        print('Matched dev accuracy = ', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
+        print('Mismatched dev accuracy = ', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
 
     else:
         sess.run(tf.assign(pred_model.embedding_w, embedding_matrix))
@@ -71,7 +76,7 @@ def run(args, ckpt_dir, ckpt_file):
             print(i, 'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
             # print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
             # print(sess.run(tf.all_variables()[0][0]))
-            print('Dev accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
+            print('SNLI Dev accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
             print('Dev matched accuracy = ', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
             print('Dev mismatched accuracy = ', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
             saver.save(sess, ckpt_file)
@@ -86,6 +91,9 @@ def run(args, ckpt_dir, ckpt_file):
     if model.use_alphas:
         print("Producing visualization")
         htmls = vis_utils.knit_nli(test_x, test_y, word_dict, None, model, sess, 100)
+        htmls.extend(vis_utils.knit_nli(dev_matched_x, dev_matched_y, word_dict, None, model, sess, 100))
+        htmls.extend(vis_utils.knit_nli(dev_mismatched_x, dev_mismatched_y, word_dict, None, model, sess, 100))
+
         f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
         for i in htmls:
             f.write(i)

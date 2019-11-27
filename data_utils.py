@@ -103,7 +103,7 @@ def sentences_to_padded_index_sequences(args, word_indices, dataset):
 
 
 # Currently not used
-def _load_all_data_mnli(args):
+def load_all_data_mnli(args):
     dev_matched = load_nli(args, "dev_matched", snli=False)
     dev_mismatched = load_nli(args, "dev_mismatched", snli=False)
     train = load_nli(args, "train", snli=False)
@@ -120,7 +120,8 @@ def _load_all_data_mnli(args):
 
     return train_x, train_y, dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y, word_dict, word_embedding
 
-def load_all_data_mnli(args, word_dict):
+
+def load_test_data_mnli(args, word_dict):
     dev_matched = load_nli(args, "dev_matched", snli=False)
     dev_mismatched = load_nli(args, "dev_mismatched", snli=False)
 
@@ -130,6 +131,7 @@ def load_all_data_mnli(args, word_dict):
     dev_mismatched_y = np.asarray([LABEL_MAP[s['gold_label']] for s in dev_mismatched])
 
     return dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y
+
 
 def load_all_data_snli(args):
     dev = load_nli(args, "dev", snli=True)
@@ -147,6 +149,18 @@ def load_all_data_snli(args):
     test_y = np.asarray([LABEL_MAP[s['gold_label']] for s in test])
 
     return train_x, train_y, dev_x, dev_y, test_x, test_y, word_dict, word_embedding
+
+
+def load_test_data_snli(args, word_dict):
+    dev = load_nli(args, "dev", snli=True)
+    test = load_nli(args, "test", snli=True)
+
+    dev_x = sentences_to_padded_index_sequences(args, word_dict, dev)
+    dev_y = np.asarray([LABEL_MAP[s['gold_label']] for s in dev])
+    test_x = sentences_to_padded_index_sequences(args, word_dict, test)
+    test_y = np.asarray([LABEL_MAP[s['gold_label']] for s in test])
+
+    return dev_x, dev_y, test_x, test_y
 
 
 def load_nli(args, set, snli=True):

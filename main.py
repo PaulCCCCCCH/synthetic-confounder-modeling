@@ -9,10 +9,10 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 args = utils.get_args()
 if args.task == "synthetic":
     import runner_synthetic as runner
-elif args.task == "snli":
+elif args.task in ["mnli", "snli"]:
     args.embedding_dim = 300
     import runner_nli as runner
-elif args.task == "mnli":
+else:
     raise NotImplementedError
 
 # Defining directories
@@ -28,9 +28,20 @@ if not os.path.exists(arg_file):
     with open(arg_file, "wb") as f:
         pickle.dump(args, f)
 else:
-    print("Restoring previous arguments from arg.pkl. See following summary args for details.")
+    print("Restoring some of previous arguments from arg.pkl. See following summary args for details.")
     with open(arg_file, "rb") as f:
-        args = pickle.load(f)
+        prev_args = pickle.load(f)
+
+    # The following arguments need to be restored to make sure it is not breaking the model
+    args.modeltype = prev_args.modeltype
+    args.reg_method = prev_args.reg_method
+    args.kwm_path = prev_args.kwm_path
+    args.max_len = prev_args.max_len
+    args.lstm_size = prev_args.lstm_size
+    args.attention_size = prev_args.attention_size
+    args.embedding_dim = prev_args.embedding_dim
+    args.batch_size = prev_args.batch_size
+
 
 # Defining constants
 datapath = args.data_path
@@ -48,8 +59,6 @@ sys.stdout = logger
 print("\n\n Started at " + str(time.ctime()))
 print("Parameter summary")
 print(args.__dict__)
-
-#Loading data:
 
 runner.run(args, ckpt_dir, ckpt_file)
 
