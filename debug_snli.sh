@@ -6,7 +6,18 @@ python main.py reg_attention debug_snli_keyword_model_entropy_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
+
+python main.py baseline_cbow debug_snli_keyword_model_cbow \
+        --epoch 5 \
+        --debug \
+        --task snli \
+        --learning_rate 0.01 \
+        --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
+        --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --batch_size 10 \
+        --step_size 3
 
 python main.py reg_attention debug_snli_keyword_model_weight_reg_attention \
         --reg_method weight\
@@ -16,6 +27,7 @@ python main.py reg_attention debug_snli_keyword_model_weight_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_snli_keyword_model_sparse_attention \
@@ -26,6 +38,7 @@ python main.py reg_attention debug_snli_keyword_model_sparse_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_snli_additive_entropy_reg_attention \
@@ -37,6 +50,7 @@ python main.py reg_attention debug_snli_additive_entropy_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_snli_additive_weight_reg_attention \
@@ -48,6 +62,7 @@ python main.py reg_attention debug_snli_additive_weight_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_snli_additive_sparse_reg_attention \
@@ -59,6 +74,7 @@ python main.py reg_attention debug_snli_additive_sparse_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py baseline_lstm debug_snli_baseline_lstm \
@@ -69,6 +85,7 @@ python main.py baseline_lstm debug_snli_baseline_lstm \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py adv_mlp debug_snli_attention_adv_mlp \
@@ -79,6 +96,7 @@ python main.py adv_mlp debug_snli_attention_adv_mlp \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py hex_attention debug_snli_attention_hex \
@@ -89,6 +107,7 @@ python main.py hex_attention debug_snli_attention_hex \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -100,6 +119,7 @@ python main.py baseline_bilstm debug_snli_bilstm \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -111,6 +131,7 @@ python main.py bilstm_attention debug_snli_bilstm_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -122,6 +143,7 @@ python main.py bilstm_attention debug_snli_bilstm_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -133,6 +155,7 @@ python main.py bilstm_attention debug_snli_bilstm_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -143,6 +166,7 @@ python main.py baseline_esim debug_snli_esim \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -154,6 +178,7 @@ python main.py baseline_esim debug_snli_additive_esim \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01
 
@@ -165,6 +190,7 @@ python main.py reg_attention debug_mnli_keyword_model_entropy_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_mnli_keyword_model_weight_reg_attention \
@@ -175,6 +201,7 @@ python main.py reg_attention debug_mnli_keyword_model_weight_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_mnli_keyword_model_sparse_attention \
@@ -185,6 +212,7 @@ python main.py reg_attention debug_mnli_keyword_model_sparse_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_mnli_additive_entropy_reg_attention \
@@ -196,6 +224,7 @@ python main.py reg_attention debug_mnli_additive_entropy_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_mnli_additive_weight_reg_attention \
@@ -207,6 +236,7 @@ python main.py reg_attention debug_mnli_additive_weight_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py reg_attention debug_mnli_additive_sparse_reg_attention \
@@ -218,6 +248,7 @@ python main.py reg_attention debug_mnli_additive_sparse_reg_attention \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py baseline_lstm debug_mnli_baseline_lstm \
@@ -238,6 +269,7 @@ python main.py adv_mlp debug_mnli_attention_adv_mlp \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10
 
 python main.py hex_attention debug_mnli_attention_hex \
@@ -260,6 +292,7 @@ python main.py baseline_bilstm debug_mnli_bilstm \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
         --batch_size 10 \
+        --step_size 3 \
         --lam 0.01
 
 python main.py bilstm_attention debug_mnli_bilstm_attention \
@@ -282,6 +315,7 @@ python main.py bilstm_attention debug_mnli_bilstm_attention \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
         --batch_size 10 \
+        --step_size 3 \
         --lam 0.01
 
 python main.py bilstm_attention debug_mnli_bilstm_attention \
@@ -303,6 +337,7 @@ python main.py baseline_esim debug_mnli_esim \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
         --batch_size 10 \
+        --step_size 3 \
         --lam 0.01
 
 python main.py baseline_esim debug_mnli_additive_esim \
@@ -313,5 +348,6 @@ python main.py baseline_esim debug_mnli_additive_esim \
         --learning_rate 0.01 \
         --data_path /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/ \
         --embedding_file /mnt/D/work/tensorflow/hex/stub_data/snli_1.0/glove.840B.300d.txt \
+        --step_size 3 \
         --batch_size 10 \
         --lam 0.01

@@ -90,6 +90,8 @@ class Model(object):
         self.lam = args.lam
         self.keep_probs = args.keep_probs
         self.kwm_lstm_size = args.kwm_lstm_size
+        self.char_len = 20
+        self.emb_dim_chars = 15
 
         self.vocab_size = vocab_size
 

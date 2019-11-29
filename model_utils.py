@@ -10,7 +10,8 @@ all_models = {
     'baseline_mlp':     'models.MLPPredModel',
     'baseline_bilstm':  'models.BiLSTMPredModel',           # NLI task only
     'bilstm_attention': 'models.BiLSTMAttentionPredModel',  # NLI task only
-    'baseline_esim':    'models.ESIMPredModel'              # NLI task only
+    'baseline_esim':    'models.ESIMPredModel',             # NLI task only
+    'baseline_cbow':    'models.CBOWPredModel'              # NLI task only
 }
 
 

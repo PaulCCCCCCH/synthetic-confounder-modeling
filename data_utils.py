@@ -66,9 +66,9 @@ SNLI_FILE_MAP = {
 }
 
 MNLI_FILE_MAP = {
-    "train": "multinli_0.9_train.jsonl",
-    "dev_matched": "multinli_0.9_dev_matched.jsonl",
-    "dev_mismatched": "multinli_0.9_dev_mismatched.jsonl"
+    "train": "multinli_1.0_train.jsonl",
+    "dev_matched": "multinli_1.0_dev_matched.jsonl",
+    "dev_mismatched": "multinli_1.0_dev_mismatched.jsonl"
 }
 
 PADDING = "<PAD>"
@@ -221,3 +221,7 @@ def load_embedding_rand(args, word_indices):
 
     return emb
 
+
+# A dummy class for testing purposes
+class A:
+    pass

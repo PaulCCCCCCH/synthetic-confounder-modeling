@@ -61,17 +61,20 @@ def get_args():
                         help="Specify a path to the pre-trained keyword model. Will only train a key-word model if left empty.")
     parser.add_argument("--max_len", type=int, default=30, help="Maximum sentence length (excessive words are dropped)")
     parser.add_argument("--lstm_size", type=int, default=20, help="Size of lstm unit in current model.")
-    parser.add_argument("--attention_size", type=int, default=16, help="Size of attention layer (if had one)")
+    parser.add_argument("--attention_size", type=int, default=128, help="Size of attention layer (if had one)")
     parser.add_argument("--embedding_dim", type=int, default=20, help="Dimension of embedding to use.")
     parser.add_argument("--data_path", type=str, default="./data",
                         help="Specify data directory (where inputs, effect list, vocabulary, etc. are )")
-    parser.add_argument("--batch_size", type=int, default=10)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--keep_probs", type=float, default=0.8,
                         help="Keep probability of dropout layers. Set it to 1.0 to disable dropout.")
     parser.add_argument("--learning_rate", type=float, default=0.1)
     parser.add_argument("--embedding_file", type=str, default="",
                         help="Specify path to the pre-trained embedding file, if had one.")
     parser.add_argument("--kwm_lstm_size", type=int, default=16, help="Only used in adversarial training models.")
+    parser.add_argument("--step_size", type=int, default=50, help="Number of batches to run before running an evaluation")
+    parser.add_argument("--vis_num", type=int, default=300, help="Defines the number of samples to include in the visualisation")
+    parser.add_argument("--patience", type=int, default=30, help="Max number of steps without improvements before an early stop")
 
     args = parser.parse_args()
     if args.modeltype not in model_types:

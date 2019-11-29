@@ -4,6 +4,7 @@
 - `tensorflow==1.15`
 - `nltk`
 - `keras`
+- `wget`
 
 ## Running NLI tasks:
 For examples, see `run_nli.sh`
@@ -35,9 +36,9 @@ Leave it empty if not using additive training.
     snli_1.0_train.jsonl,
     snli_1.0_dev.jsonl,
     snli_1.0_test.jsonl,
-    multinli_0.9_train.jsonl,
-    multinli_0.9_dev_matched.jsonl,
-    multinli_0.9_dev_mismatched.jsonl
+    multinli_1.0_train.jsonl,
+    multinli_1.0_dev_matched.jsonl,
+    multinli_1.0_dev_mismatched.jsonl
 ```
 - `--embedding_file`: e.g. "./glove.840B.300d.txt". Required for nli tasks. If the embedding you use is not
 300-dimensional, please specify its dimension using `--embedding_dim`.
@@ -129,5 +130,5 @@ parser.add_argument("--outdir", default="./data", help="Define output path")
 
 ## TODO:
 - Put a reference at line 13 and 18 for HEX and ESIM
-
-
+- Read Glove Embedding before building models to allow emb_train
+- Input of some models may not be masked (i.e. non-zero weights assigned to padding)

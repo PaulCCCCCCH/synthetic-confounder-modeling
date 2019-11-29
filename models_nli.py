@@ -28,6 +28,24 @@ class AdditiveModel(object):
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.pred_model.learning_rate)
         self.train_op = self.optimizer.minimize(self.cost)
 
+    def train_for_step(self, sess, train_x, train_y, start_idx, step_size=50):
+        step_loss = 0
+        step_accuracy = 0
+        for i in range(step_size):
+            batch_idx = np.array(range(start_idx + i * self.batch_size, start_idx + (i + 1) * self.batch_size))
+            batch_xs = train_x[batch_idx, :, :]
+            batch_ys = train_y[batch_idx]
+            batch_loss, _, batch_accuracy = sess.run([self.cost, self.train_op, self.accuracy],
+                                                     feed_dict={self.pred_model.x_holder: batch_xs,
+                                                                self.pred_model.y_holder: batch_ys,
+                                                                self.keyword_model.x_holder: batch_xs,
+                                                                self.keyword_model.y_holder: batch_ys})
+            step_loss += batch_loss
+            step_accuracy += batch_accuracy
+        step_loss /= step_size
+        step_accuracy /= step_size
+        print("Current step loss: ", step_loss , "Current step accuracy: ", step_accuracy )
+        return step_loss, step_accuracy
 
     def train_for_epoch(self, sess, train_x, train_y):
         # cur_state = sess.run(init_state)
@@ -74,6 +92,26 @@ class AdditiveModel(object):
 
 
 class NLIModel(Model):
+
+    def train_for_step(self, sess, train_x, train_y, start_idx, step_size=50):
+        step_loss = 0
+        step_accuracy = 0
+        for i in range(step_size):
+            # batch_idx = np.random.choice(train_x.shape[0], size=self.batch_size, replace=False)
+            batch_idx = np.array(range(start_idx + i * self.batch_size, start_idx + (i + 1) * self.batch_size))
+            batch_xs = train_x[batch_idx, :, :]
+            batch_ys = train_y[batch_idx]
+            batch_loss, _, batch_accuracy = sess.run([self.cost, self.train_op, self.accuracy],
+                                                     feed_dict={self.x_holder: batch_xs,
+                                                                self.y_holder: batch_ys})
+            step_loss += batch_loss
+            step_accuracy += batch_accuracy
+
+        step_loss /= step_size
+        step_accuracy /= step_size
+        print("Current step loss: ", step_loss, "Current step accuracy: ", step_accuracy)
+        return step_loss, step_accuracy
+
 
     def train_for_epoch(self, sess, train_x, train_y):
         # cur_state = sess.run(init_state)
@@ -550,3 +588,48 @@ class ESIMPredModel(NLIModel):
         self.train_op = self.optimizer.minimize(self.cost)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
+
+class CBOWPredModel(NLIModel):
+    def build_model(self):
+
+        ## Define placeholders
+        self.keep_rate_ph = tf.placeholder(tf.float32, [])
+
+        self.W_0 = tf.Variable(tf.random_normal([self.emb_dim * 4, self.emb_dim], stddev=0.1), name="w0")
+        self.b_0 = tf.Variable(tf.random_normal([self.emb_dim], stddev=0.1), name="b0")
+
+        self.W_1 = tf.Variable(tf.random_normal([self.emb_dim, self.emb_dim], stddev=0.1), name="w1")
+        self.b_1 = tf.Variable(tf.random_normal([self.emb_dim], stddev=0.1), name="b1")
+
+        self.W_2 = tf.Variable(tf.random_normal([self.emb_dim, self.emb_dim], stddev=0.1), name="w2")
+        self.b_2 = tf.Variable(tf.random_normal([self.emb_dim], stddev=0.1), name="b2")
+
+        self.W_cl = tf.Variable(tf.random_normal([self.emb_dim, 3], stddev=0.1), name="wcl")
+        self.b_cl = tf.Variable(tf.random_normal([3], stddev=0.1), name="bcl")
+
+
+        premise_rep = tf.reduce_sum(self.e_prem, 1)
+        hypothesis_rep = tf.reduce_sum(self.e_hypo, 1)
+
+        ## Combinations
+        h_diff = premise_rep - hypothesis_rep
+        h_mul = premise_rep * hypothesis_rep
+
+        ### MLP
+        mlp_input = tf.concat([premise_rep, hypothesis_rep, h_diff, h_mul], 1)
+        h_1 = tf.nn.relu(tf.matmul(mlp_input, self.W_0) + self.b_0)
+        h_2 = tf.nn.relu(tf.matmul(h_1, self.W_1) + self.b_1)
+        h_3 = tf.nn.relu(tf.matmul(h_2, self.W_2) + self.b_2)
+        h_drop = tf.nn.dropout(h_3, self.keep_probs)
+
+        # Get prediction
+        self.logits = tf.matmul(h_drop, self.W_cl) + self.b_cl
+
+
+        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
+        self.y = tf.nn.softmax(self.logits)
+
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
+        self.train_op = self.optimizer.minimize(self.cost)
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))

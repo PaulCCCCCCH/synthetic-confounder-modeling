@@ -4,11 +4,13 @@ from data_utils import *
 import utils
 import models_nli as models   # This is necessary!
 import model_utils
+import time
 
 
 def run(args, ckpt_dir, ckpt_file):
 
     # Loading data
+    print("Loading data")
     if args.task == "snli":
         train_x, train_y, dev_x, dev_y, test_x, test_y, word_dict, embedding_matrix = load_all_data_snli(args)
         dev_matched_x, dev_matched_y, dev_mismatched_x, dev_mismatched_y = load_test_data_mnli(args, word_dict)
@@ -71,32 +73,60 @@ def run(args, ckpt_dir, ckpt_file):
             saver.restore(sess, ckpt_file)
 
         print('Training..')
+        best_acc = 0
+        wait = 0
+        steps_per_epoch = train_x.shape[0] // args.step_size // args.batch_size - 1
+        early_stop = False
         for i in range(args.epochs):
-            epoch_loss, epoch_accuracy = model.train_for_epoch(sess, train_x, train_y)
-            print(i, 'loss: ', epoch_loss, 'acc: ', epoch_accuracy)
-            # print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
-            # print(sess.run(tf.all_variables()[0][0]))
-            print('SNLI Dev accuracy = ', model.evaluate_accuracy(sess, dev_x, dev_y))
-            print('Dev matched accuracy = ', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
-            print('Dev mismatched accuracy = ', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
-            saver.save(sess, ckpt_file)
+            if early_stop:
+                break
+            for j in range(steps_per_epoch):
+                print("\n")
+                print("Epoch " + str(i) + " Step " + str(j) + " at " + str(time.ctime()))
+                step_loss, step_accuracy = model.train_for_step(sess, train_x, train_y, j*args.step_size*args.batch_size, args.step_size)
+                print('Batch: ' + str(j*args.step_size) + '  loss: ' + str(step_loss) + '  acc: ' + str(step_accuracy))
+                # print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
+                # print(sess.run(tf.all_variables()[0][0]))
+
+                dev_idx = np.random.choice(dev_x.shape[0], size=dev_x.shape[0]//10, replace=False)
+                dev_x_sample = dev_x[dev_idx]
+                dev_y_sample = dev_y[dev_idx]
+                dev_acc = model.evaluate_accuracy(sess, dev_x_sample, dev_y_sample)
+                print('SNLI Dev accuracy estimation = ', dev_acc)
+
+
+                if dev_acc > best_acc:
+                    wait = 0
+                    best_acc = dev_acc
+                    print("Checkpointing with Best SNLI Dev accuracy ", dev_acc)
+                    saver.save(sess, ckpt_file)
+                else:
+                    wait += 1
+
+                if j % 10 == 0:
+                    print('Dev matched accuracy', model.evaluate_accuracy(sess, dev_matched_x, dev_matched_y))
+                    print('Dev mismatched accuracy', model.evaluate_accuracy(sess, dev_mismatched_x, dev_mismatched_y))
+                    dev_acc = model.evaluate_accuracy(sess, dev_x, dev_y)
+                    print('SNLI Dev accuracy', dev_acc)
+
+                if wait > args.patience:
+                    print("No improvements in the last " + str(wait) + " steps, stopped early.")
+                    early_stop = True
+                    break
 
         if not os.path.exists(ckpt_dir):
             os.mkdir(ckpt_dir)
 
-        print("Saving the model")
-        saver.save(sess, ckpt_file)
         print("Finished")
 
     if model.use_alphas:
         print("Producing visualization")
-        htmls = vis_utils.knit_nli(test_x, test_y, word_dict, None, model, sess, 100)
-        htmls.extend(vis_utils.knit_nli(dev_matched_x, dev_matched_y, word_dict, None, model, sess, 100))
-        htmls.extend(vis_utils.knit_nli(dev_mismatched_x, dev_mismatched_y, word_dict, None, model, sess, 100))
+        htmls = vis_utils.knit_nli(test_x, test_y, word_dict, None, model, sess, args.vis_num)
+        htmls.extend(vis_utils.knit_nli(dev_matched_x, dev_matched_y, word_dict, None, model, sess, args.vis_num))
+        htmls.extend(vis_utils.knit_nli(dev_mismatched_x, dev_mismatched_y, word_dict, None, model, sess, args.vis_num))
 
         f = open(os.path.join(ckpt_dir, "vis.html"), "wb")
         for i in htmls:
             f.write(i)
         f.close()
-
 
