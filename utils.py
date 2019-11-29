@@ -68,7 +68,7 @@ def get_args():
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--keep_probs", type=float, default=0.8,
                         help="Keep probability of dropout layers. Set it to 1.0 to disable dropout.")
-    parser.add_argument("--learning_rate", type=float, default=0.1)
+    parser.add_argument("--learning_rate", type=float, default=0.0004)
     parser.add_argument("--embedding_file", type=str, default="",
                         help="Specify path to the pre-trained embedding file, if had one.")
     parser.add_argument("--kwm_lstm_size", type=int, default=16, help="Only used in adversarial training models.")

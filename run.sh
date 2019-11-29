@@ -41,7 +41,6 @@ python main.py baseline_esim snli_additive_esim_reg_attention \
         --kwm_path ./models/snli_keyword_model_entropy_reg_attention \
         --epoch 5 \
         --task snli \
-        --learning_rate 0.01 \
         --data_path ./nli_data/ \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --attention_size 128
@@ -50,7 +49,6 @@ python main.py baseline_esim snli_additive_esim_reg_attention \
 python main.py baseline_esim snli_esim \
         --epoch 5 \
         --task snli \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --attention_size 128
@@ -60,7 +58,6 @@ python main.py baseline_cbow snli_additive_cbow_reg_attention\
         --epoch 5 \
         --task snli \
         --kwm_path ./models/snli_keyword_model_entropy_reg_attention \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --patience 100
@@ -70,7 +67,6 @@ python main.py baseline_cbow snli_additive_cbow_reg_attention\
 python main.py baseline_cbow snli_cbow \
         --epoch 5 \
         --task snli \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --patience 100
@@ -90,7 +86,6 @@ python main.py baseline_esim mnli_additive_esim_reg_attention \
         --kwm_path ./models/mnli_keyword_model_entropy_reg_attention \
         --epoch 5 \
         --task mnli \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --attention_size 128
@@ -99,7 +94,6 @@ python main.py baseline_esim mnli_additive_esim_reg_attention \
 python main.py baseline_esim mnli_esim \
         --epoch 5 \
         --task mnli \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
         --attention_size 128
@@ -110,19 +104,17 @@ python main.py baseline_cbow mnli_additive_cbow_reg_attention\
         --epoch 5 \
         --task mnli \
         --kwm_path ./models/mnli_keyword_model_entropy_reg_attention \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
-        --patience 100
+        --patience 100 \
 
 
 # Train a cbow baseline model on mnli
 python main.py baseline_cbow mnli_cbow \
         --epoch 5 \
         --task mnli \
-        --learning_rate 0.01 \
         --data_path ./nli_data \
         --embedding_file ./nli_data/glove.840B.300d.txt \
-        --patience 100
+        --patience 100 \
 
 
