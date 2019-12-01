@@ -120,7 +120,7 @@ def run(args, ckpt_dir, ckpt_file):
         print("Finished")
 
     if model.use_alphas:
-        print("Producing visualization")
+        print("Producing visualization...")
         htmls = vis_utils.knit_nli(test_x, test_y, word_dict, None, model, sess, args.vis_num)
         htmls.extend(vis_utils.knit_nli(dev_matched_x, dev_matched_y, word_dict, None, model, sess, args.vis_num))
         htmls.extend(vis_utils.knit_nli(dev_mismatched_x, dev_mismatched_y, word_dict, None, model, sess, args.vis_num))
@@ -129,4 +129,5 @@ def run(args, ckpt_dir, ckpt_file):
         for i in htmls:
             f.write(i)
         f.close()
+        print("...done")
 

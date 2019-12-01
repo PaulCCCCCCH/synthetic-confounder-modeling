@@ -11,3 +11,4 @@ data/samples.txt
 .DS_Store
 */.DS_Store
 nli_data/
+models/

@@ -113,7 +113,7 @@ def knit_nli(xs, ys, word_dict, effect_list, model, sess, show=100):
     predictions = []
     alphass_hypo = []
     alphass_prem = []
-    for i in range(show // model.batch_size - 1):
+    for i in range(show // model.batch_size):
         p_batch, alpha_hypo_batch, alpha_prem_batch = model.predict(sess, xs[i*model.batch_size: (i+1)*model.batch_size])
         p_batch = np.argmax(p_batch, axis=1)
         predictions.extend(p_batch)

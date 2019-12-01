@@ -16,6 +16,10 @@ class AdditiveModel(object):
             self.use_alphas = True
             self.alphas_hypo = self.pred_model.alphas_hypo
             self.alphas_prem = self.pred_model.alphas_prem
+        elif self.keyword_model.use_alphas:
+            self.use_alphas = True
+            self.alphas_hypo = self.keyword_model.alphas_hypo
+            self.alphas_prem = self.keyword_model.alphas_prem
         self.build_model()
 
     def build_model(self):
@@ -25,7 +29,7 @@ class AdditiveModel(object):
             labels=tf.one_hot(self.pred_model.y_holder, depth=3), logits=self.logits))
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.pred_model.y_holder, tf.argmax(self.pred_model.y, 1)), tf.float32))
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.pred_model.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.pred_model.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
 
     def train_for_step(self, sess, train_x, train_y, start_idx, step_size=50):
