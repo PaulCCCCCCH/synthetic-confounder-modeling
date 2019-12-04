@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from model_utils import dense_layer, attention_layer, get_reg, lstm_layer
+from model_utils import dense_layer, attention_layer, get_reg, lstm_layer, dropout
 
 
 class AdditiveModel(object):
@@ -90,8 +90,6 @@ class Model(object):
         self.lam = args.lam
         self.keep_probs = args.keep_probs
         self.kwm_lstm_size = args.kwm_lstm_size
-        self.char_len = 20
-        self.emb_dim_chars = 15
 
         self.vocab_size = vocab_size
 
@@ -164,7 +162,8 @@ class Model(object):
 
     def build_embedding(self):
         self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size,self.emb_dim], initializer=tf.random_uniform_initializer())
-        self.e = tf.nn.embedding_lookup(self.embedding_w, self.x_holder)
+        self.e = dropout(tf.nn.embedding_lookup(self.embedding_w, self.x_holder), self.keep_probs)
+
 
 
 class RegAttention(Model):

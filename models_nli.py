@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import blocks
-from model_utils import dense_layer, attention_layer, get_reg, lstm_layer
+from model_utils import dense_layer, attention_layer, get_reg, lstm_layer, dropout
 from models import Model
 
 
@@ -156,15 +156,17 @@ class NLIModel(Model):
         # input shape = (batch_size, sentence_length, emb_dim)
         self.x_holder = tf.placeholder(tf.int32, shape=[None, 2, self.max_len])
         self.y_holder = tf.placeholder(tf.int64, shape=[None])
-        self.seq_len_prem = tf.cast(tf.reduce_sum(tf.sign(self.x_holder[:, 0, :]), axis=1), tf.int32)
-        self.seq_len_hypo = tf.cast(tf.reduce_sum(tf.sign(self.x_holder[:, 1, :]), axis=1), tf.int32)
+        #self.prem_seq_lengths = tf.cast(tf.reduce_sum(tf.sign(self.x_holder[:, 0, :]), axis=1), tf.int32)
+        #self.hyp_seq_lengths = tf.cast(tf.reduce_sum(tf.sign(self.x_holder[:, 1, :]), axis=1), tf.int32)
+        self.prem_seq_lengths, self.mask_prem = blocks.length(self.x_holder[:, 0, :])
+        self.hyp_seq_lengths, self.mask_hyp = blocks.length(self.x_holder[:, 1, :])
 
-    def build_embedding(self):
+    def build_embedding(self, drop=True):
         self.embedding_w = tf.get_variable('embed_w', shape=[self.vocab_size, self.emb_dim],
-                                               initializer=tf.random_uniform_initializer(), trainable=False)
+                                               initializer=tf.random_uniform_initializer())
 
-        self.e_hypo = tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 0, :])
-        self.e_prem = tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 1, :])
+        self.e_prem = dropout(tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 1, :]), self.keep_probs)
+        self.e_hypo = dropout(tf.nn.embedding_lookup(self.embedding_w, self.x_holder[:, 0, :]), self.keep_probs)
 
 
 class RegAttention(NLIModel):
@@ -173,29 +175,28 @@ class RegAttention(NLIModel):
         # input shape = (batch_size, sentence_length, emb_dim)
 
         self.use_alphas = True
-        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.seq_len_hypo, "hypo")
-        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.seq_len_prem, "prem")
 
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse)
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
+        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
+        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        self.alphas_hypo = alphas_hypo
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.mask_prem)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.mask_hyp)
+
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
+        self.alphas_hypo = alphas_hypo
+        self.logits = dense_layer(tf.concat([last_output_prem, last_output_hypo], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
         # WARNING: This op expects unscaled logits, since it performs a softmax on logits internally for efficiency.
         # Do not call this op with the output of softmax, as it will produce incorrect results.
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
-
         reg1 = get_reg(alphas_hypo, lam=self.lam, type=self.reg)
         reg2 = get_reg(alphas_prem, lam=self.lam, type=self.reg)
-        self.cost += reg1 + reg2
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits)) + reg1 + reg2
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
-        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
 
 
@@ -203,19 +204,19 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(NLIModel):
 
     def build_model(self):
         self.use_alphas = True
-        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.seq_len_hypo, "hypo")
-        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.seq_len_prem, "prem")
+        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
+        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse)
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
-        self.alphas_hypo = alphas_hypo
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
+        self.alphas_hypo = alphas_hypo
+        self.logits = dense_layer(tf.concat([last_output_prem, last_output_hypo], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
 
-        adv_in_hypo = tf.reshape(self.e_hypo, [-1, self.e_hypo.shape[1] * self.e_hypo.shape[2]])
         adv_in_prem = tf.reshape(self.e_prem, [-1, self.e_prem.shape[1] * self.e_hypo.shape[2]])
+        adv_in_hypo = tf.reshape(self.e_hypo, [-1, self.e_hypo.shape[1] * self.e_hypo.shape[2]])
         """
         ### Debug ###
         self.w_adv = tf.get_variable("w", shape=[adv_in.shape[-1], 2],
@@ -235,44 +236,41 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(NLIModel):
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
-        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
-
 
 class LSTMPredModel(NLIModel):
 
     def build_model(self):
         self.use_alphas = True
-        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.seq_len_hypo, "hypo")
-        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.seq_len_prem, "prem")
+        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
+        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse)
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
-        self.alphas_hypo = alphas_hypo
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
         self.alphas_prem = alphas_prem
-        self.logits = dense_layer(tf.concat([last_output_hypo, last_output_prem], axis=1), 3, activation=None, name="pred_out")
+        self.alphas_hypo = alphas_hypo
+        self.logits = dense_layer(tf.concat([last_output_prem, last_output_hypo], axis=1), 3, activation=None, name="pred_out")
         self.y = tf.nn.softmax(self.logits)
 
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
-
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits))
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
-        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
 
 
 class MLPPredModel(NLIModel):
 
     def build_model(self):
-        inputs_hypo = tf.reshape(self.e_hypo, [-1, self.e_hypo.shape[1] * self.e_hypo.shape[2]])
         inputs_prem = tf.reshape(self.e_prem, [-1, self.e_prem.shape[1] * self.e_prem.shape[2]])
+        inputs_hypo = tf.reshape(self.e_hypo, [-1, self.e_hypo.shape[1] * self.e_hypo.shape[2]])
 
-        self.logits = dense_layer(tf.concat([inputs_hypo, inputs_prem], axis=1), 3, activation=None, name="pred_out")
+        self.logits = dense_layer(tf.concat([inputs_prem, inputs_hypo], axis=1), 3, activation=None, name="pred_out")
 
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
-
-        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits))
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
 
         self.y = tf.nn.softmax(self.logits)
@@ -285,23 +283,23 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
     def build_model(self):
         self.use_alphas = True
         # Define prediction rnn
-        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.seq_len_hypo, "hypo")
-        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.seq_len_prem, "prem")
+        rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
+        rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse)
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse)
-        self.alphas_hypo = alphas_hypo
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
         self.alphas_prem = alphas_prem
+        self.alphas_hypo = alphas_hypo
         # last_output = tf.nn.dropout(last_output, self.keep_probs)
 
         # Define key-word model rnn
-        kwm_rnn_outputs_hypo, kwm_final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.seq_len_hypo, scope="kwm_hypo")
-        kwm_rnn_outputs_prem, kwm_final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.seq_len_prem, scope="kwm_prem")
-        kwm_last_output_hypo, kwm_alphas_hypo = attention_layer(self.attention_size, kwm_rnn_outputs_hypo, "kwm_encoder_hypo", sparse=self.sparse)
-        kwm_last_output_prem, kwm_alphas_prem = attention_layer(self.attention_size, kwm_rnn_outputs_prem, "kwm_encoder_prem", sparse=self.sparse)
+        kwm_rnn_outputs_prem, kwm_final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, scope="kwm_prem")
+        kwm_last_output_prem, kwm_alphas_prem = attention_layer(self.attention_size, kwm_rnn_outputs_prem, "kwm_encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
+        kwm_rnn_outputs_hypo, kwm_final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, scope="kwm_hypo")
+        kwm_last_output_hypo, kwm_alphas_hypo = attention_layer(self.attention_size, kwm_rnn_outputs_hypo, "kwm_encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
 
-        last_output = tf.concat([last_output_hypo, last_output_prem], axis=1)
-        kwm_last_output = tf.concat([kwm_last_output_hypo, kwm_last_output_prem], axis=1)
+        last_output = tf.concat([last_output_prem, last_output_hypo], axis=1)
+        kwm_last_output = tf.concat([kwm_last_output_prem, kwm_last_output_hypo], axis=1)
 
         ############################
         # Hex #########################
@@ -345,16 +343,16 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
         self.logits = y_conv_loss
         self.y = tf.nn.softmax(self.logits)
 
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
+
 
         # Regularize kwm attention
         reg1 = get_reg(kwm_alphas_hypo, lam=self.lam, type=self.reg)
         reg2 = get_reg(kwm_alphas_prem, lam=self.lam, type=self.reg)
 
-        self.cost += reg1 + reg2
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits)) + reg1 + reg2
 
-        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
         self.train_op = self.optimizer.minimize(self.cost)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_holder, tf.argmax(self.y, 1)), tf.float32))
 
@@ -409,8 +407,8 @@ class BiLSTMPredModel(NLIModel):
         self.logits = tf.matmul(h_drop, self.W_cl) + self.b_cl
 
         # Define the cost function
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits))
         self.y = tf.nn.softmax(self.logits)
 
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
@@ -438,13 +436,13 @@ class BiLSTMAttentionPredModel(NLIModel):
         hypothesis_in = tf.nn.dropout(self.e_hypo, keep_prob=self.keep_probs)
 
         premise_outs, premise_final = blocks.biLSTM(premise_in, dim=self.emb_dim, seq_len=prem_seq_lengths, name='premise')
-        attention_outs_pre, self.alphas_pre = attention_layer(self.attention_size, premise_outs, 'prem_encoder_attention', sparse=self.sparse)
+        attention_outs_pre, self.alphas_pre = attention_layer(self.attention_size, premise_outs, 'prem_encoder_attention', sparse=self.sparse, mask=self.prem_seq_lengths)
         drop_pre = tf.nn.dropout(attention_outs_pre, self.keep_probs)
         # drop_pre = attention_outs_pre
 
         hypothesis_outs, hypothesis_final = blocks.biLSTM(hypothesis_in, dim=self.emb_dim, seq_len=hyp_seq_lengths,
                                                           name='hypothesis')
-        attention_outs_hyp, self.alphas_hyp = attention_layer(self.attention_size, hypothesis_outs, 'hypo_encoder_attention', sparse=self.sparse)
+        attention_outs_hyp, self.alphas_hyp = attention_layer(self.attention_size, hypothesis_outs, 'hypo_encoder_attention', sparse=self.sparse, mask=self.hyp_seq_lengths)
         drop_hyp = tf.nn.dropout(attention_outs_hyp, self.keep_probs)
         # drop_hyp = attention_outs_hyp
 
@@ -483,8 +481,8 @@ class ESIMPredModel(NLIModel):
 
 
         # Get lengths of unpadded sentences
-        prem_seq_lengths, mask_prem = blocks.length(self.x_holder[:, 0, :])
-        hyp_seq_lengths, mask_hyp = blocks.length(self.x_holder[:, 1, :])
+        prem_seq_lengths, self.mask_prem = blocks.length(self.x_holder[:, 0, :])
+        hyp_seq_lengths, self.mask_hyp = blocks.length(self.x_holder[:, 1, :])
 
         ### First biLSTM layer ###
         premise_in = tf.nn.dropout(self.e_prem, keep_prob=self.keep_probs)
@@ -513,7 +511,7 @@ class ESIMPredModel(NLIModel):
                 scores_i_list.append(score_ij)
 
             scores_i = tf.stack(scores_i_list, axis=1)
-            alpha_i = blocks.masked_softmax(scores_i, mask_hyp)
+            alpha_i = blocks.masked_softmax(scores_i, tf.expand_dims(self.mask_hyp, -1))
             a_tilde_i = tf.reduce_sum(tf.multiply(alpha_i, hypothesis_bi), 1)
             premise_attn.append(a_tilde_i)
 
@@ -527,7 +525,7 @@ class ESIMPredModel(NLIModel):
         betas = []
         for j in range(self.max_len):
             scores_j = scores_list[j]
-            beta_j = blocks.masked_softmax(scores_j, mask_prem)
+            beta_j = blocks.masked_softmax(scores_j, tf.expand_dims(self.mask_prem, -1))
             b_tilde_j = tf.reduce_sum(tf.multiply(beta_j, premise_bi), 1)
             hypothesis_attn.append(b_tilde_j)
 
@@ -584,8 +582,8 @@ class ESIMPredModel(NLIModel):
         # Define the cost function
 
         # Define the cost function
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits))
         self.y = tf.nn.softmax(self.logits)
 
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
@@ -630,8 +628,8 @@ class CBOWPredModel(NLIModel):
         self.logits = tf.matmul(h_drop, self.W_cl) + self.b_cl
 
 
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(self.y_holder, depth=3), logits=self.logits))
+        self.cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.y_holder, logits=self.logits))
         self.y = tf.nn.softmax(self.logits)
 
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)

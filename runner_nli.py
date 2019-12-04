@@ -75,7 +75,7 @@ def run(args, ckpt_dir, ckpt_file):
         print('Training..')
         best_acc = 0
         wait = 0
-        steps_per_epoch = train_x.shape[0] // args.step_size // args.batch_size - 1
+        steps_per_epoch = train_x.shape[0] // args.step_size // args.batch_size
         early_stop = False
         for i in range(args.epochs):
             if early_stop:
@@ -88,7 +88,7 @@ def run(args, ckpt_dir, ckpt_file):
                 # print('Train accuracy = ', model.evaluate_accuracy(sess, train_x, train_y))
                 # print(sess.run(tf.all_variables()[0][0]))
 
-                dev_idx = np.random.choice(dev_x.shape[0], size=dev_x.shape[0]//10, replace=False)
+                dev_idx = np.random.choice(dev_x.shape[0], size=dev_x.shape[0]//5, replace=False)
                 dev_x_sample = dev_x[dev_idx]
                 dev_y_sample = dev_y[dev_idx]
                 dev_acc = model.evaluate_accuracy(sess, dev_x_sample, dev_y_sample)
@@ -109,7 +109,7 @@ def run(args, ckpt_dir, ckpt_file):
                     dev_acc = model.evaluate_accuracy(sess, dev_x, dev_y)
                     print('SNLI Dev accuracy', dev_acc)
 
-                if wait > args.patience:
+                if wait > args.patience and not i == 0:
                     print("No improvements in the last " + str(wait) + " steps, stopped early.")
                     early_stop = True
                     break

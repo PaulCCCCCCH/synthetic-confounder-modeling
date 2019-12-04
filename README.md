@@ -130,5 +130,4 @@ parser.add_argument("--outdir", default="./data", help="Define output path")
 
 ## TODO:
 - Put a reference at line 13 and 18 for HEX and ESIM
-- Read Glove Embedding before building models to allow emb_train
 - Input of some models may not be masked (i.e. non-zero weights assigned to padding)

@@ -15,19 +15,21 @@ all_models = {
 }
 
 
-def attention_layer(attention_size, inputs, name, sparse=False):
+def attention_layer(attention_size, inputs, name, sparse=False, mask=None):
 
     if isinstance(inputs, tuple):
         # In case of Bi-RNN, concatenate the forward and the backward RNN outputs.
         inputs = tf.concat(inputs, 2)
 
-    w_omega = tf.get_variable('w_omega_'+name, initializer=tf.random_normal([int(inputs.shape[-1]), attention_size]))
-    b_omega = tf.get_variable('b_omega_'+name, initializer=tf.random_normal([attention_size]))
-    u_omega = tf.get_variable('u_omega_'+name, initializer=tf.random_normal([attention_size]))
+    w_omega = tf.get_variable('w_omega_'+name, initializer=tf.random_normal([int(inputs.shape[-1]), attention_size], stddev=0.1))
+    b_omega = tf.get_variable('b_omega_'+name, initializer=tf.random_normal([attention_size], stddev=0.1))
+    u_omega = tf.get_variable('u_omega_'+name, initializer=tf.random_normal([attention_size], stddev=0.1))
 
     value = tf.tanh(tf.tensordot(inputs, w_omega, axes=1) + b_omega)
 
     vu = tf.tensordot(value, u_omega, axes=1, name='vu_'+name)
+    if mask is not None:
+        vu = vu * mask
     if sparse:
         print("Using sparsemax attention")
         alphas = tf.contrib.sparsemax.sparsemax(vu, name='alphas_'+name)
@@ -36,6 +38,10 @@ def attention_layer(attention_size, inputs, name, sparse=False):
     last_output = tf.reduce_sum(inputs * tf.expand_dims(alphas, -1), 1)
 
     return last_output, alphas
+
+
+def dropout(x, rate=0.5):
+    return tf.nn.dropout(x, rate)
 
 
 def dense_layer(inputs, out_dim, name, activation=None):
@@ -88,6 +94,8 @@ def get_model(args, init, vocab_size):
 
     model = init(args, vocab_size)
     return model
+
+
 
 
 def get_additive_model(init, pred_model, keyword_model):

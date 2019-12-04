@@ -177,8 +177,10 @@ def load_nli(args, set, snli=True):
             if snli:
                 loaded_example["genre"] = "snli"
             data.append(loaded_example)
+        """
         random.seed(1)
         random.shuffle(data)
+        """
     return data
 
 
