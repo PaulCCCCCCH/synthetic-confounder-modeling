@@ -12,3 +12,5 @@ data/samples.txt
 */.DS_Store
 nli_data/
 models/
+failed/
+logs/

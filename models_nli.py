@@ -207,8 +207,8 @@ class LSTMPredModelWithMLPKeyWordModelAdvTrain(NLIModel):
         rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
         rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.mask_prem)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.mask_hyp)
         self.alphas_prem = alphas_prem
         self.alphas_hypo = alphas_hypo
         self.logits = dense_layer(tf.concat([last_output_prem, last_output_hypo], axis=1), 3, activation=None, name="pred_out")
@@ -246,8 +246,8 @@ class LSTMPredModel(NLIModel):
         rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
         rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.mask_prem)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.mask_hyp)
         self.alphas_prem = alphas_prem
         self.alphas_hypo = alphas_hypo
         self.logits = dense_layer(tf.concat([last_output_prem, last_output_hypo], axis=1), 3, activation=None, name="pred_out")
@@ -286,17 +286,17 @@ class LSTMPredModelWithRegAttentionKeyWordModelHEX(NLIModel):
         rnn_outputs_prem, final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, "prem")
         rnn_outputs_hypo, final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, "hypo")
 
-        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
-        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
+        last_output_prem, alphas_prem = attention_layer(self.attention_size, rnn_outputs_prem, "encoder_prem", sparse=self.sparse, mask=self.mask_prem)
+        last_output_hypo, alphas_hypo = attention_layer(self.attention_size, rnn_outputs_hypo, "encoder_hypo", sparse=self.sparse, mask=self.mask_hyp)
         self.alphas_prem = alphas_prem
         self.alphas_hypo = alphas_hypo
         # last_output = tf.nn.dropout(last_output, self.keep_probs)
 
         # Define key-word model rnn
         kwm_rnn_outputs_prem, kwm_final_state_prem = lstm_layer(self.e_prem, self.lstm_size, self.batch_size, self.prem_seq_lengths, scope="kwm_prem")
-        kwm_last_output_prem, kwm_alphas_prem = attention_layer(self.attention_size, kwm_rnn_outputs_prem, "kwm_encoder_prem", sparse=self.sparse, mask=self.prem_seq_lengths)
+        kwm_last_output_prem, kwm_alphas_prem = attention_layer(self.attention_size, kwm_rnn_outputs_prem, "kwm_encoder_prem", sparse=self.sparse, mask=self.mask_prem)
         kwm_rnn_outputs_hypo, kwm_final_state_hypo = lstm_layer(self.e_hypo, self.lstm_size, self.batch_size, self.hyp_seq_lengths, scope="kwm_hypo")
-        kwm_last_output_hypo, kwm_alphas_hypo = attention_layer(self.attention_size, kwm_rnn_outputs_hypo, "kwm_encoder_hypo", sparse=self.sparse, mask=self.hyp_seq_lengths)
+        kwm_last_output_hypo, kwm_alphas_hypo = attention_layer(self.attention_size, kwm_rnn_outputs_hypo, "kwm_encoder_hypo", sparse=self.sparse, mask=self.mask_hyp)
 
         last_output = tf.concat([last_output_prem, last_output_hypo], axis=1)
         kwm_last_output = tf.concat([kwm_last_output_prem, kwm_last_output_hypo], axis=1)
@@ -436,13 +436,13 @@ class BiLSTMAttentionPredModel(NLIModel):
         hypothesis_in = tf.nn.dropout(self.e_hypo, keep_prob=self.keep_probs)
 
         premise_outs, premise_final = blocks.biLSTM(premise_in, dim=self.emb_dim, seq_len=prem_seq_lengths, name='premise')
-        attention_outs_pre, self.alphas_pre = attention_layer(self.attention_size, premise_outs, 'prem_encoder_attention', sparse=self.sparse, mask=self.prem_seq_lengths)
+        attention_outs_pre, self.alphas_pre = attention_layer(self.attention_size, premise_outs, 'prem_encoder_attention', sparse=self.sparse, mask=self.mask_prem)
         drop_pre = tf.nn.dropout(attention_outs_pre, self.keep_probs)
         # drop_pre = attention_outs_pre
 
         hypothesis_outs, hypothesis_final = blocks.biLSTM(hypothesis_in, dim=self.emb_dim, seq_len=hyp_seq_lengths,
                                                           name='hypothesis')
-        attention_outs_hyp, self.alphas_hyp = attention_layer(self.attention_size, hypothesis_outs, 'hypo_encoder_attention', sparse=self.sparse, mask=self.hyp_seq_lengths)
+        attention_outs_hyp, self.alphas_hyp = attention_layer(self.attention_size, hypothesis_outs, 'hypo_encoder_attention', sparse=self.sparse, mask=self.mask_hyp)
         drop_hyp = tf.nn.dropout(attention_outs_hyp, self.keep_probs)
         # drop_hyp = attention_outs_hyp
 
