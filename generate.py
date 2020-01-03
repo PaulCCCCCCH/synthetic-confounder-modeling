@@ -2,7 +2,7 @@ from collections import Counter
 from os import path, mkdir
 import pickle
 from nltk.util import ngrams as nltk_ngrams
-from numpy.random import choice, normal, binomial, uniform
+from numpy.random import choice, normal, binomial, uniform, random
 import numpy as np
 import argparse
 
@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("numtogen", help="Input number of sample sentences to generate", type=int, default=10)
 parser.add_argument("grams", help="Specify the number n in n-gram", type=int, default=3)
 
+parser.add_argument("--split", type=float, help="Percentage of training sample. A real value from 0 to 1", default=0.8)
 parser.add_argument("--rebuild", action="store_true", default=False, help="Rebuild vocab and word effect")
 parser.add_argument("--filter_n", type=int, help="Consider only the subset of vocabulary that appeared greater than or equal to n times", default=3)
 parser.add_argument("--outdir", default="./data", help="Define output path")
@@ -18,7 +19,15 @@ args = parser.parse_args()
 
 NGRAM = args.grams
 NUM_TO_GEN = args.numtogen
+assert 0 <= args.split <= 1
+SPLIT = int(NUM_TO_GEN * args.split)
 EMB_DIM = 20
+KEYWORD_THRESHOLD = 2.5
+RATIO = 0.2
+
+def is_keyword(word_idx, effect_list):
+    return abs(effect_list[word_idx]) > KEYWORD_THRESHOLD
+
 
 # Reading files
 fs = open("data/orig_sentences.txt", "rb")
@@ -94,7 +103,8 @@ if not path.exists("data/effect_list.pkl") or args.rebuild:
         for word, count in counts:
             posterior = float(count) * sentence_count / (label_count * total_words)
             ##### TODO: May need to fine tune the formula #####
-            raw_effects[word] = np.log(posterior + 10) + normal()
+            # raw_effects[word] = np.log(posterior + 10)
+            raw_effects[word] = posterior
             ################
         raw_effect_all_labels[i] = raw_effects
 
@@ -106,22 +116,32 @@ if not path.exists("data/effect_list.pkl") or args.rebuild:
         raw_effect_list[word_dict[word]] = (neg, neu, pos)
         ##### TODO: May need to fine tune the formula 
         ##### Also, use add-one or discount method to get rid of None's
+        if neg is None:
+            neg = 0
+        if pos is None:
+            pos = 0
+        d = pos - neg
+        effect = np.exp(d) - 1 if d > 0 else -np.exp(-d) + 1
+        effect = np.cbrt(effect) * 100 + 0.1 * normal()
+
+        """
         if neg is None and pos is None:
             effect = 0
         elif neg is None:
             effect = 5 + normal()
         elif pos is None:
             effect = -5 + normal()
-        elif pos - neg >= 1:
-            effect = 5 + normal()
-        elif neg - pos >= 1:
-            effect = -5 + normal()
-        elif pos > neg:
-            effect = 1 + normal()
-        elif neg > pos:
-            effect = -1 + normal()
-        else:
-            effect = 0
+       elif pos - neg >= 1:
+           effect = 5 + normal()
+       elif neg - pos >= 1:
+           effect = -5 + normal()
+       elif pos > neg:
+           effect = 1 + normal()
+       elif neg > pos:
+           effect = -1 + normal()
+       else:
+           effect = 0
+       """
         effect_list[word_dict[word]] = effect
         ###############
 
@@ -169,6 +189,7 @@ else:
 print("Generating samples")
 samples = []
 generated = 0
+
 # for i in range(NUM_TO_GEN):
 while generated < NUM_TO_GEN:
     cur_sentence = ["<s>"] * NGRAM
@@ -202,7 +223,7 @@ while generated < NUM_TO_GEN:
     cur_sentence = cur_sentence[NGRAM: ]
     for word in cur_sentence:
         # Accept the sample only when it has words with strong effects in it
-        if abs(effect_list[word_dict[word]]) > 3:
+        if is_keyword(word_dict[word], effect_list):
             sample = dict()
             # Record the sentence as list of words
             sample["sentence"] = cur_sentence
@@ -210,10 +231,20 @@ while generated < NUM_TO_GEN:
             sample["effect"] = np.asarray([effect_list[word_dict[word]] for word in cur_sentence])
             # Record bag-of-words representation of the sentence
             bow = np.asarray([0 for _ in range(vocab_size)])
-            for word in cur_sentence:
-                bow[word_dict[word]] = 1
+            is_kwd_sentence = random() < RATIO
+            for w in cur_sentence:
+                # For a keyword sentence in training set
+                if generated < SPLIT and is_kwd_sentence:
+                    # Consider only keywords
+                    bow[word_dict[w]] = 1 if is_keyword(word_dict[w], effect_list) else 0
+                # For a normal sentence in training set
+                elif generated < SPLIT:
+                    # Consider all words
+                    bow[word_dict[w]] = 1
+                else:
+                    # Consider only non-keywords
+                    bow[word_dict[w]] = 0 if is_keyword(word_dict[w], effect_list) else 1
             sample["bow_repr"] = bow
-
             sample["sentence_ind"] = np.asarray([word_dict[word] for word in cur_sentence])
 
             r = np.dot(bow, effect_list) + normal()
@@ -237,12 +268,22 @@ print("Writing output files")
 if not path.exists(args.outdir):
     mkdir(args.outdir)
 
-f = open(args.outdir + "/samples.pkl", "wb")
-pickle.dump(samples, f)
+f = open(args.outdir + "/samples_train.pkl", "wb")
+pickle.dump(samples[:SPLIT], f)
 f.close()
 
-f = open(args.outdir + "/samples.txt", "wb")
-for i in samples:
+f = open(args.outdir + "/samples_train.txt", "wb")
+for i in samples[:SPLIT]:
+    line = str(i["label"]) + " " + " ".join(i["sentence"]) + "\n"
+    f.write(line)
+f.close()
+
+f = open(args.outdir + "/samples_test.pkl", "wb")
+pickle.dump(samples[SPLIT:], f)
+f.close()
+
+f = open(args.outdir + "/samples_test.txt", "wb")
+for i in samples[SPLIT:]:
     line = str(i["label"]) + " " + " ".join(i["sentence"]) + "\n"
     f.write(line)
 f.close()
