@@ -1,5 +1,7 @@
 # Deconfounding Key-word Statistics
 
+Writeup [here](https://github.com/PaulCCCCCCH/synthetic-confounder-modeling/blob/master/Rearranged_SNLI_Long_Paper.pdf)
+
 ## Dependencies:
 - `tensorflow==1.15`
 - `nltk`
